@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# secrets — NEVER commit real env
+.env
+.env.local
+.env.*.local
+
+# next / build
+.next/
+out/
+dist/
+build/
+
+# prisma
+prisma/*.db
+prisma/migrations/dev.db*
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+coverage/
+.vscode/
+.idea/
+
+# minio local data (if mounted)
+.minio-data/
