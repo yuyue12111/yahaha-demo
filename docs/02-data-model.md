@@ -12,10 +12,14 @@
 | `TaskStatus` | `PENDING` · `RUNNING` · `SUCCEEDED` · `FAILED` · `CANCELED` |
 | `AgentName` | `INGEST` · `PLANNER` · `ASSET_CURATOR` · `CODER` · `VALIDATOR` · `PACKAGER` |
 | `AssetKind` | `UPLOAD` · `GENERATED` · `COVER` |
-| `RuntimeKind` | `HTML5_CANVAS` · `PHASER3` |
+| `RuntimeKind` | `HTML5_CANVAS` · `PHASER3`（wire 值 `html5-canvas`/`phaser3`，见下方命名规范注） |
 | `AuthProvider` | `CREDENTIALS` · `GOOGLE` · `GITHUB` |
 | `PlayEventType` | `LOAD` · `START` · `END` · `ERROR` |
 | `LogLevel` | `INFO` · `WARN` · `ERROR` |
+
+> **RuntimeKind 命名规范（MED-5，接 Prisma 前硬约束）**：DB/Prisma 用大写下划线符号 `HTML5_CANVAS`/`PHASER3`，
+> 经 Prisma `@map("html5-canvas")`/`@map("phaser3")` 落库为 **wire 值**（小写连字符）；wire 值是 manifest/API/postMessage/seed
+> 的唯一对外形态。代码侧单一真源 = `src/lib/contracts/runtime.ts`（`RUNTIME_DB_TO_WIRE` / `RUNTIME_WIRE_TO_DB` 映射）。
 
 ## 实体
 
