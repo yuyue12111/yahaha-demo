@@ -5,7 +5,7 @@ import { GameCard } from "@/components/game/GameCard";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const games = await listPublishedGames();
+  const { items: games } = await listPublishedGames();
 
   return (
     <div>
