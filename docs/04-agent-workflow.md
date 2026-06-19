@@ -85,7 +85,7 @@ PENDING ──(worker 取)──▶ RUNNING ──(全节点 OK)──▶ SUCCEE
 
 ## 产物 = 可玩 bundle
 
-不是代码片段/截图，而是 MinIO 上 `games/{gameId}/{version}/` 下的 `index.html + game.js + assets/* + manifest.json + cover.png`，由 Play 加载（见 `05` / `06`）。
+不是代码片段/截图，而是 MinIO 上 `games/{gameId}/{version}/` 下的 `index.html + game.js + assets/* + manifest.json + cover.png|cover.svg`，由 Play 加载（见 `05` / `06`）。
 
 ## durable step / 可观测（借鉴 C）
 
