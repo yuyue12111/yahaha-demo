@@ -25,14 +25,29 @@ if (env.S3_PUBLIC_ENDPOINT.includes("minio:")) {
 
 export const BUCKET = env.S3_BUCKET;
 
+const credentials = {
+  accessKeyId: env.S3_ACCESS_KEY_ID,
+  secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+};
+
+/** In-network client — server-side object IO against `S3_ENDPOINT` (`minio:9000` in compose). */
 export const s3 = new S3Client({
   endpoint: env.S3_ENDPOINT,
   region: env.S3_REGION,
   forcePathStyle: env.S3_FORCE_PATH_STYLE,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
+  credentials,
+});
+
+/**
+ * Public-endpoint client — ONLY for presigning browser-facing URLs. The signed canonical
+ * request includes the host header, so a URL signed against `minio:9000` would fail when the
+ * browser PUTs/GETs to `localhost:9000`. Presign against the same host the browser will hit.
+ */
+const s3public = new S3Client({
+  endpoint: env.S3_PUBLIC_ENDPOINT,
+  region: env.S3_REGION,
+  forcePathStyle: env.S3_FORCE_PATH_STYLE,
+  credentials,
 });
 
 /**
@@ -74,7 +89,29 @@ export async function objectExists(key: string): Promise<boolean> {
   }
 }
 
-/** Short-lived presigned GET — for private `uploads/*`. `games/*` is public-read, so no signing. */
+/**
+ * Short-lived presigned GET — browser-reachable read of a private `uploads/*` object
+ * (e.g. Create's upload thumbnail). Signed against the PUBLIC endpoint. `games/*` is
+ * public-read, so Play never needs this.
+ */
 export function presignGet(key: string, expiresIn = 300): Promise<string> {
-  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn });
+  return getSignedUrl(s3public, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn });
+}
+
+/**
+ * Short-lived presigned PUT — the browser uploads multimodal assets DIRECTLY to MinIO
+ * (never through the app, docs/07 §2). Presigned against the PUBLIC endpoint so the URL the
+ * browser receives is actually reachable from the browser (dual-endpoint: the in-network
+ * `minio:9000` host would 502 from a laptop). ContentType is bound into the signature.
+ */
+export function presignPut(
+  key: string,
+  contentType: string,
+  expiresIn = 300,
+): Promise<string> {
+  return getSignedUrl(
+    s3public,
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    { expiresIn },
+  );
 }

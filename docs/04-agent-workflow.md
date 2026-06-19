@@ -22,7 +22,7 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
 | `PLANNER` | `{ brief }` | `GameSpec` | 创意 → 结构化设计规格（见下 Schema）。 |
 | `ASSET_CURATOR` | `{ spec, assets[] }` | `AssetPlan` | 把上传素材映射到精灵/背景，缺口用占位/生成；输出含 S3 key 映射。 |
 | `CODER` | `{ spec, assetPlan }` | `{ files: {path,content}[] }` | 产出自包含 HTML5 游戏（满足运行时契约：挂载 `#game-root` + postMessage 生命周期）。内部可带有限自修复。 |
-| `VALIDATOR` | `{ files }` | `{ ok, errors[], coverPng? }` | 静态解析(acorn/esbuild) + 运行时契约存在性 + 体积/安全扫描；**可选** headless 冒烟渲染并截图当封面。 |
+| `VALIDATOR` | `{ files }` | `{ ok, errors[], coverPng? }` | **静态**校验：运行时契约存在性 + 体积/CSP 扫描（**绝不执行生成码**）。AST 解析(acorn/esbuild) **DEFERRED 2026-06-19** —— 当前用结构/字符串校验（语法坏的 game.js 理论可漏过，但模板化 CODER 恒产合法码，happy path 不触）。**可选** headless 截图当封面。 |
 | `PACKAGER` | `{ files, validation }` | `{ manifest, bundleKeys[], coverKey, manifestUrl }` | 算哈希、组 `manifest.json`、上传 MinIO 版本化路径、写 `Version`。 |
 
 ## GameSpec（PLANNER 输出，Zod 契约）
@@ -38,9 +38,16 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
   "loseCondition": "string",
   "theme": "string",
   "palette": ["#rrggbb"],            // 配色
-  "requiredAssets": [{ "id": "string", "role": "sprite|background|sfx", "description": "string" }]
+  "requiredAssets": [{ "id": "string", "role": "sprite|background|sfx", "description": "string" }],
+  "engine": {                         // 可选·实现调参：CODER 内联进 game.js，使产物随输入变化
+    "mode": "dodge|catch|reaction",   // 通用 canvas 引擎的玩法分支
+    "bg": "#rrggbb", "grid": "#rrggbb",
+    "speed": 0, "accel": 0, "spawnMs": 0, "misses": 1
+  }
 }
 ```
+> `engine` 是 PLANNER 产出的**实现层调参**（mock/真实模型均可填）；CODER 据它内联 `SPEC` 进 `game.js`，
+> 让玩法/配色/速度随输入变（异输入异产物，规避 3.4.4 固定假数据）。缺省时 CODER 用确定性兜底。
 
 ## AssetPlan（ASSET_CURATOR 输出）
 
@@ -71,17 +78,18 @@ interface ModelClient {
 PENDING ──(worker 取)──▶ RUNNING ──(全节点 OK)──▶ SUCCEEDED
    ▲                        │
    │                        ├──(节点抛错/超时/校验失败)──▶ FAILED
-   └──(retry 从失败节点)─────┘
+   └──(retry 幂等整跑)───────┘   // 续跑见下「失败恢复」实现注
 ```
 - `currentStep` 随节点更新；每节点起止写 `AgentLog`。
 - 超时：整任务 `GENERATION_TIMEOUT_MS` 看护，防卡 `RUNNING`。
 
 ## 失败恢复（见 `08-...` 矩阵）
 
-- 模型坏输出 → 节点内有限重试 + 校验后再打包。
+- 模型坏输出 → 节点内有限重试（PLANNER 已实现）+ 校验后再打包。
 - 瞬时失败（模型限流/上传抖动）→ `MAX_AGENT_RETRIES` 指数退避（BullMQ）。
-- 终态失败 → `FAILED` + `error` + 失败节点入 `AgentLog`；UI 提供 `retry`（从失败节点重排）。
-- 兜底：`VALIDATOR` 反复失败时回退到确定性 mock 产物，保证至少可玩（demo 不硬失败）。
+- 终态失败 → `FAILED` + `error` + 失败节点入 `AgentLog`；UI 提供 `retry`。worker 崩溃遗留的 `RUNNING` 由启动 reaper + BullMQ stalled 回收为 `FAILED`（MED-5）。
+  - **retry 语义（实现注，2026-06-19）**：当前 = 从 `INGEST` **幂等整跑**（新 `attempt`、复用 `task.gameId`、产 `versionNumber+1`）；**「从失败节点续跑（durable-step 复用前序产物）」DEFERRED 至 post-MVP**（mock 幂等、整链 ~3s，续跑收益小）。
+- 兜底（**DEFERRED 2026-06-19**）：`VALIDATOR` 反复失败 → 回退确定性 mock 产物。**当前架构下不需要**：CODER 为确定性模板（模型只影响 PLANNER 的 GameSpec、**不直接产码**），其输出恒是「确定性 mock 产物」且恒过存在性校验；该 fallback 仅当 CODER 改为「模型直接产码」时才需要。
 
 ## 产物 = 可玩 bundle
 
@@ -89,4 +97,4 @@ PENDING ──(worker 取)──▶ RUNNING ──(全节点 OK)──▶ SUCCEE
 
 ## durable step / 可观测（借鉴 C）
 
-每节点是可独立重试、结果可缓存的检查点；Create UI 渲染 run-timeline（Planner→Coder→Validator…）映射节点起止与 IO 摘要，使"多步非黑盒"可证。
+每节点是可独立重试的检查点（**结果缓存 / 从失败节点续跑 DEFERRED 2026-06-19**，当前 retry 为幂等整跑）；Create UI 渲染 run-timeline（Planner→Coder→Validator…）映射节点起止与 IO 摘要，使"多步非黑盒"可证。

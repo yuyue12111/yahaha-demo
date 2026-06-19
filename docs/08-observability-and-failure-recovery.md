@@ -21,13 +21,13 @@
 
 | 失败点 | 检测 | 恢复 |
 |--------|------|------|
-| 模型输出不稳定（非法 JSON/不合契约） | 节点输出 Zod 校验失败 | 节点内有限修复重试；仍失败→`FAILED` 记录；兜底回退确定性 mock 产物 |
-| 模型瞬时失败（限流/超时/网络） | 调用异常 | BullMQ `MAX_AGENT_RETRIES` 指数退避；记录 `attempt` |
-| 构建/校验失败（产物不可跑/超体积） | VALIDATOR 静态/冒烟检查 | 反馈 CODER 自修复一轮；超 `MAX_BUNDLE_BYTES` 直接拦截；终态 `FAILED` |
-| 上传失败（MinIO 抖动） | PutObject 异常 | 重试；持续失败→`FAILED`，产物未半写（先全量再写 `Version`） |
+| 模型输出不稳定（非法 JSON/不合契约） | 节点输出 Zod 校验失败 | 节点内有限修复重试（PLANNER 已实现）；仍失败→`FAILED`。「兜底回退确定性 mock 产物」**DEFERRED 2026-06-19**：CODER 为确定性模板（不由模型直接产码）→ 其输出已是确定性产物、恒过校验，fallback 当前不需要（见 `04` 失败恢复注） |
+| 模型瞬时失败（限流/超时/网络） | 调用异常 | BullMQ 重试/退避（注：当前 job `attempts:1`，避免双跑有副作用的流水线；节点内修复重试承担坏输出，见 `04`）；记录 `attempt` |
+| 构建/校验失败（产物不可跑/超体积） | VALIDATOR 静态检查 | 超 `MAX_BUNDLE_BYTES`/缺契约 → 终态 `FAILED`。「CODER 自修复一轮」**DEFERRED 2026-06-19**（模板化 CODER 恒产合法码，故未建） |
+| 上传失败（MinIO 抖动） | PutObject 异常 | `FAILED`；**先全量上传产物、再于一个事务原子写 Game+Version**（MED-4）→ 失败只留无害 MinIO 字节，**零 DB 孤儿** |
 | 发布失败（并发/状态冲突） | 事务校验 | 事务回滚；幂等：重复发布同 version 无副作用 |
 | 加载失败（Play：404/CORS/超时） | manifest 校验 / iframe onerror / 看护超时 | `failed` 态显示失败 URL+原因+重试，绝不白屏 |
-| 任务卡死 | `GENERATION_TIMEOUT_MS` 看护 | 置 `FAILED(timeout)`，释放 worker |
+| 任务卡死 | `GENERATION_TIMEOUT_MS` 进程内看护 **+** worker 启动 reaper / BullMQ stalled | 看护覆盖「worker 存活但任务超时」；**worker 崩溃**（看护随进程死）由启动 reaper 扫 `RUNNING` 孤儿 + stalled 事件回收为 `FAILED`（MED-5） |
 
 ## 任务态对外可见
 
@@ -39,7 +39,7 @@
 
 ## 重试语义
 
-`POST /api/tasks/:id/retry` 从失败节点重排（已成功的前序节点结果可复用 → durable step）；新 `attempt`，复用同 `gameId`，产 `versionNumber+1`（或覆盖 PREVIEW，按实现注明）。
+**实现（2026-06-19）**：`POST /api/tasks/:id/retry` = 清旧 `AgentLog` + 从 `INGEST` **幂等整跑**（新 `attempt`、复用同 `gameId`、产 `versionNumber+1`）。「从失败节点续跑（durable-step 复用已成功前序节点产物）」**DEFERRED 至 post-MVP** —— mock 幂等、整链 ~3s，续跑收益小；且前序产物未持久化（`AgentLog` 仅存 IO 摘要字符串，不足以续跑）。
 
 ## 演示用最小观测面（确保 grader 看得见）
 
