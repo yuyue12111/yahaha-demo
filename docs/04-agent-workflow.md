@@ -38,9 +38,16 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
   "loseCondition": "string",
   "theme": "string",
   "palette": ["#rrggbb"],            // 配色
-  "requiredAssets": [{ "id": "string", "role": "sprite|background|sfx", "description": "string" }]
+  "requiredAssets": [{ "id": "string", "role": "sprite|background|sfx", "description": "string" }],
+  "engine": {                         // 可选·实现调参：CODER 内联进 game.js，使产物随输入变化
+    "mode": "dodge|catch|reaction",   // 通用 canvas 引擎的玩法分支
+    "bg": "#rrggbb", "grid": "#rrggbb",
+    "speed": 0, "accel": 0, "spawnMs": 0, "misses": 1
+  }
 }
 ```
+> `engine` 是 PLANNER 产出的**实现层调参**（mock/真实模型均可填）；CODER 据它内联 `SPEC` 进 `game.js`，
+> 让玩法/配色/速度随输入变（异输入异产物，规避 3.4.4 固定假数据）。缺省时 CODER 用确定性兜底。
 
 ## AssetPlan（ASSET_CURATOR 输出）
 
