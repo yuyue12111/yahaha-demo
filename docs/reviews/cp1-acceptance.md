@@ -11,6 +11,23 @@
 
 ---
 
+## 0. 复验结果（2026-06-19，fix 轮之后）
+
+**✅ RE-VERIFY PASS** — build session 的修复轮（`8608c8d..3f34d90`，5 个 commit）全部落地，**无任何红线 / 必须保留项回退**。reviewer 已重建栈（`docker compose up -d --build`）并对新代码现场复验：
+
+| 项 | 复验方式 | 结果 |
+|----|---------|------|
+| MED-1 | 移走远端 entry（留 manifest）→ 开 Play | ✅ 现在即时出「加载失败 / 入口产物缺失（ENTRY_NOT_FOUND）」卡、无 iframe、非白屏（旧版是绿 "Loaded" 盖 XML）；API 返 `502 {error:{code:INTERNAL,details:{reason:ENTRY_NOT_FOUND}}}`；`resolveActiveVersion` 经 `objectExists()` 走 storage.ts，未开新 fs 路径 |
+| MED-6 | `curl /api/games/<不存在>/active-version` | ✅ `404 {"error":{"code":"NOT_FOUND","message":"未找到该游戏","details":{"reason":"GAME_NOT_FOUND"}}}` |
+| MED-7 | `curl -I /` 和 `/play/*` | ✅ `Content-Security-Policy: frame-src 'self' http://localhost:9000; frame-ancestors 'none'` |
+| MED-5 | diff + happy-path | ✅ `runtime.ts` 单一真源 + DB⇄wire 映射；seed manifest 在收紧后（`createdAt.datetime()` / 拒 `./`）仍验证通过（active-version 200） |
+| MED-3 | grep image | ✅ postgres/redis/node 已 digest 钉死；minio/mc 原本已钉 |
+| §5 必须保留 | grep + 现场 | ✅ `fs`/`@aws-sdk` 仍只在 storage.ts；`allow-same-origin` 仅出现在注释；无 srcdoc；Play happy-path iframe `src`=远端 + `sandbox="allow-scripts"` + Source 徽章均无回退 |
+
+附带 LOW-7/8（createdAt ISO8601、拒 `./`）也一并修了。剩余 5 个未勾选项为 LOW 打磨/CP2 项，可结转。
+
+---
+
 ## 1. 验收结论 + 红线状态
 
 CP1 是一次高质量、没有取巧的实现。所有问题都是 MED/LOW，**没有一条阻断验收**。
