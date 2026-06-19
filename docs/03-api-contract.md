@@ -49,10 +49,10 @@
 
 | 方法 | 路径 | 鉴权 | 请求 | 响应 |
 |------|------|:----:|------|------|
-| POST | `/api/tasks` | 是 | `{ prompt, assetIds?: string[], gameId?, remixOfVersionId? }` | **202** `{ taskId, status:"PENDING" }`（写 task + enqueue 后**立即返回**，绝不阻塞跑模型） |
+| POST | `/api/tasks` | 是 | `{ prompt, assetIds?: string[], gameId?, remixOfVersionId? }` | **202** `{ taskId, status:"PENDING" }`（写 task + enqueue 后**立即返回**，绝不阻塞跑模型）。越权（他人 `gameId`/`assetId`）→ 403。注：`remixOfVersionId` 当前 **accepted-but-ignored**（Remix DEFERRED 至加分轮，2026-06-19） |
 | GET | `/api/tasks/:id` | 是(本人) | — | `{ task, logs: AgentLog[] }`（轮询兜底） |
 | GET | `/api/tasks/:id/stream` | 是(本人) | — | **SSE**，见下 |
-| POST | `/api/tasks/:id/retry` | 是(本人) | — | 202 `{ taskId }`（从失败节点重排，加分/失败恢复） |
+| POST | `/api/tasks/:id/retry` | 是(本人) | — | 202 `{ taskId }`。**实现注 2026-06-19**：从 `INGEST` **幂等整跑**（复用 `task.gameId`、产 v+1）；「从失败节点续跑」DEFERRED（见 `08` §重试语义） |
 
 ### SSE 事件契约（`text/event-stream`）
 
