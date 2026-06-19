@@ -20,6 +20,7 @@
 - **交付目标**：本地 `docker compose up` 可复现为**唯一**交付；公网 URL 不在范围（仅大幅领先时作可选 stretch）。
 - 详见 `docs/01-architecture.md` 的技术栈表。
 - **视觉基调**：方向 A 霓虹街机为底 + B 的克制（暗色 plum、双渐变 Play/Create、星形 logo）；token 见 `docs/10-design-system.md`。
+- **环境**：开发机已装 Docker Desktop（PERSONAL/免费），Claude 的 Bash **可直接 `docker` / `docker compose`**。验证以 `docker compose up` 为准；brew 原生服务仅作可选的快速内循环。
 
 ## 2. 五条 Fatal 雷区与守卫（绝不能踩 = 3.4 倒读）
 
