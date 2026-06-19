@@ -65,5 +65,5 @@
 ## CORS 注意
 
 - iframe `src` 作为**导航**不受 CORS 限制 → 入口 doc 必通。
-- 若 fetch `manifest.json` 或游戏内 fetch 同级资源 → 需 MinIO CORS（`minio-init` 用 `mc` 设 bucket CORS，allow-origin = `NEXT_PUBLIC_APP_URL`）。
+- 若 fetch `manifest.json` 或游戏内 fetch 同级资源 → 需 MinIO CORS（由 compose `minio` 服务 env `MINIO_API_CORS_ALLOW_ORIGIN`=app 源 提供，**非** minio-init）。CP1 happy-path 不依赖它（导航不受 CORS 限制 + manifest 服务端校验）。
 - 任何加载失败都进 `failed` 态打印失败 URL，绝不静默白屏。

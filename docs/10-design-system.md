@@ -60,10 +60,10 @@
 | Button · Create | `--grad-create`，pill，深字 700 |
 | Button · 主 CTA | 白底 `#F4F1FA` + 字 `#0C0A14`，pill（模态如「创建账号」） |
 | Button · 次/ghost | 透明 + `--border` 1px，字 `--text-muted`→hover `--text`，`r-lg`（借 B 也可紫描边） |
-| Game card | 竖版 3:4，`r-lg`，封面满铺 + `--border-brand`；左下 play-count 徽章（`rgba(0,0,0,.55)` pill 白字 ▶）；卡下：标题 15/700 + 作者行（头像 18–20 + `--text-muted` 名） |
+| Game card | 竖版 3:4，`r-lg`，封面满铺 + `--border-brand`；左下 play-count 徽章（`rgba(0,0,0,.55)` pill 白字 ▶）；卡下**六项**：标题 15/700 · 简介（1–2 行截断 `--text-muted`）· 标签（pill 行，`--border`+`--text-muted`）· 作者行（头像 18–20 + `--text-muted` 名）· 发布时间（`--text-faint`）。与 docs/00:33（MVP 必做）/ 02 / 03 GameCard 六项一致 |
 | Sidebar nav | item 14/500 + 图标 20；选中 = `--surface-2` 底 + `r-md`；顶部 Play 大 pill |
 | Input（Create 聊天） | `--surface-inset` 底，`r-lg`，占位 `--text-faint`，发送按钮 = `--grad-create` 圆形 |
-| State pill | 见状态色；圆点 + 文案（loaded/pending/running/failed） |
+| State pill | 见状态色；圆点 + 文案（loaded/pending/running/failed/ended） |
 | **Source 徽章（Play）** | `--surface-inset` + `--border` 1px，mono 11，字 `--text-muted`，云图标 `#27E0FF`；内容 `Source: <远端 URL>` |
 | 星形 logo | squircle（圆角≈30%）`--grad-play` + 白色星图标；"Yahaha" 字重 800 |
 | Modal | `--surface` 底，`r-xl`，scrim `rgba(0,0,0,.55)`，可选轻阴影 `0 12px 40px rgba(0,0,0,.5)` |
@@ -75,7 +75,7 @@
    `--background=--bg` · `--foreground=--text` · `--card=--surface` · `--popover=--surface` ·
    `--primary` 用 `--grad-play` 端点 `#C03BFF`、`--primary-foreground=#fff` · `--muted=--surface-2`、`--muted-foreground=--text-muted` ·
    `--border=--border` · `--input=--border` · `--ring=#27E0FF` · `--destructive=--danger` · `--radius=12px`。
-4. **字体**：`next/font/google` 引 `Plus_Jakarta_Sans`（subsets latin，weights 400/500/700/800）挂到 `<body>`。
+4. **字体**：`next/font/local` 引 vendored `Plus Jakarta Sans`（weights 400/500/700/800，woff2 入仓 `src/app/fonts/`，无构建期网络）挂到 `<body>`。
 
 ## 已知取舍
 - 渐变/暗色为品牌必需，未采用 claude 扁平浅色范式；mockup 见会话中的 A/B 风格板。

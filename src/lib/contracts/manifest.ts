@@ -1,11 +1,11 @@
 import { z } from "zod";
+import { RuntimeKind, RUNTIME_KINDS } from "./runtime";
+
+// RuntimeKind 的单一真源在 ./runtime（含 DB⇄wire 映射，MED-5）；这里 re-export 保持既有 import 路径可用。
+export { RuntimeKind, RUNTIME_KINDS };
 
 /** Remote artifact manifest — docs/05-remote-artifact-protocol.md. Validated on write AND read. */
 export const MANIFEST_SCHEMA_VERSION = 1 as const;
-
-export const RUNTIME_KINDS = ["html5-canvas", "phaser3"] as const;
-export const RuntimeKind = z.enum(RUNTIME_KINDS);
-export type RuntimeKind = z.infer<typeof RuntimeKind>;
 
 /**
  * A relative, prefix-local artifact path. These get concatenated into MinIO keys / the iframe
@@ -16,8 +16,12 @@ const relPath = z
   .string()
   .min(1)
   .refine(
-    (p) => !p.startsWith("/") && !p.includes("..") && !/^[a-zA-Z][\w+.-]*:/.test(p),
-    { message: "must be a relative, prefix-local path (no leading '/', no '..', no URL scheme)" },
+    (p) =>
+      !p.startsWith("/") &&
+      !p.startsWith("./") &&
+      !p.includes("..") &&
+      !/^[a-zA-Z][\w+.-]*:/.test(p),
+    { message: "must be a relative, prefix-local path (no leading '/' or './', no '..', no URL scheme)" },
   );
 
 export const ManifestFile = z.object({
@@ -57,7 +61,7 @@ export const Manifest = z.object({
   postMessageContract: PostMessageContract,
   csp: z.string().min(1),
   createdBy: z.string().optional(),
-  createdAt: z.string().optional(),
+  createdAt: z.string().datetime().optional(),
   integrity: z.object({ bundleSha256: z.string().optional() }).optional(),
 });
 export type Manifest = z.infer<typeof Manifest>;

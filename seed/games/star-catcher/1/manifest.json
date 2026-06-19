@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "gameId": "star-catcher",
+  "version": 1,
+  "title": "Star Catcher",
+  "summary": "移动接星器接住坠落的霓虹星，漏 3 颗结束。方向键 / A·D 或触屏移动。",
+  "runtime": "html5-canvas",
+  "entry": "index.html",
+  "controls": "← → 或 A / D 移动；空格 / 点击 重新开始",
+  "files": [
+    { "path": "index.html", "contentType": "text/html" },
+    { "path": "game.js", "contentType": "application/javascript" },
+    { "path": "cover.svg", "contentType": "image/svg+xml" }
+  ],
+  "assets": [],
+  "postMessageContract": {
+    "version": 1,
+    "ready": "GAME_LOADED",
+    "score": "GAME_SCORE",
+    "ended": "GAME_ENDED",
+    "error": "GAME_ERROR"
+  },
+  "csp": "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'",
+  "createdBy": "seed",
+  "createdAt": "2026-06-19T00:00:00.000Z",
+  "integrity": {}
+}

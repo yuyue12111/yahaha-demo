@@ -64,36 +64,36 @@ CP1 是一次高质量、没有取巧的实现。所有问题都是 MED/LOW，**
 
 ## 3. 🟡 建议修（MED）— 勾选清单
 
-- [ ] **MED-1 — entry 对象 404 被误判为 "Loaded"（唯一触及"已实现代码正确性"的项，已现场复现）**
+- [x] **MED-1 — entry 对象 404 被误判为 "Loaded"（唯一触及"已实现代码正确性"的项，已现场复现）**
   - 现象：manifest 存在但入口对象缺失时，跨域 iframe 对 404 也触发 `onload`，15s watchdog 把状态降级为绿色 **"Loaded"**，画面是 MinIO 的 `NoSuchKey` XML。技术上非白屏（底线守住），但"Loaded"盖在坏帧上是错误 UX。
   - 证据：`src/components/play/PlayShell.tsx:61-70`（watchdog 降级分支 `setStatus("loaded")`）、`:161-163`（`onLoad` 置 `onloadRef`，无 `onError`）、`src/lib/active-version.ts:21,27`（只校验 manifest、不 HEAD 入口）。
   - 修法：watchdog 默认落 `failed`（除非真收到 `GAME_LOADED`）；和/或在 `resolveActiveVersion` 用现成的 `src/lib/storage.ts:68 objectExists()` HEAD 一下入口，缺失就返回 `MANIFEST_UNAVAILABLE`。**这是 CP3 packager 开始产 manifest 前最该补的一刀。**
 
-- [ ] **MED-2 — README 过期，掩盖了能跑的事实**
+- [x] **MED-2 — README 过期，掩盖了能跑的事实**
   - 证据：`README.md:5`「状态：脚手架/契约阶段」；`:15`「快速开始（TODO）」；`:19` `# docker compose up --build`（被注释）。与能跑的栈矛盾。
   - 修法：删状态行、改成真 quick-start、解注释 compose 命令、补 `localhost:3000` / `localhost:9001`。（注：README 收尾本排在 D2 PM，属预期内，可顺手提前。）
 
-- [ ] **MED-3 — 三个基础镜像用浮动 tag，损复现性**
+- [x] **MED-3 — 三个基础镜像用浮动 tag，损复现性**
   - 证据：`docker-compose.yml:13` `postgres:16-alpine`、`:29` `redis:7-alpine`、`Dockerfile:2,20` `node:22-alpine`（minio/mc 已钉版本/digest）。
   - 修法：统一钉 patch tag 或 sha256 digest。
 
-- [ ] **MED-4 — `docs/07-security.md:11` 仍写"宿主只接受来自 MinIO 源的消息"，与已更正的 `docs/06` 冲突**
+- [x] **MED-4 — `docs/07-security.md:11` 仍写"宿主只接受来自 MinIO 源的消息"，与已更正的 `docs/06` 冲突**
   - 证据：`docs/07:11` vs `docs/06:27-30`（帧 origin 为 `"null"`、绝不断言 origin）。代码是对的（`PlayShell.tsx:74` 用 `event.source` 身份）。
   - 修法：把 `docs/07:11` 改为「源身份 + Zod 信封」规则，注明 null-origin，交叉引用 docs/06。
 
-- [ ] **MED-5 — `RuntimeKind` 拼写分叉：`docs/02` DB 枚举 `HTML5_CANVAS` vs 代码/manifest 的 `html5-canvas`（最承重）**
+- [x] **MED-5 — `RuntimeKind` 拼写分叉：`docs/02` DB 枚举 `HTML5_CANVAS` vs 代码/manifest 的 `html5-canvas`（最承重）**
   - 证据：`docs/02-data-model.md:15,68` vs `src/lib/contracts/manifest.ts:6-7`、`games.ts:8`、`seed-games.ts:20`、`seed/.../manifest.json`。
   - 修法：在 docs/02 定一个规范映射（如 Prisma `HTML5_CANVAS @map("html5-canvas")`）或在 `src/lib/contracts/` 放 DB枚举⇄wire 映射器。**D1-PM 接 Prisma 前必须统一，否则反序列化会撞。**
 
-- [ ] **MED-6 — active-version 错误体是扁平 `{error:string,detail}`，与 `docs/03` 约定的 `{error:{code,message,details}}` 信封不一致**
+- [x] **MED-6 — active-version 错误体是扁平 `{error:string,detail}`，与 `docs/03` 约定的 `{error:{code,message,details}}` 信封不一致**
   - 证据：`src/app/api/games/[id]/active-version/route.ts:14-17`、`active-version.ts:17,31` vs `docs/03:8-9`（目前 HTTP 错误体未被调用）。
   - 修法：立 `src/lib/contracts/error.ts` 的 `ErrorEnvelope` + `errorEnvelope()` helper，`GAME_NOT_FOUND→NOT_FOUND` 等映射。**趁 API 面还小先立，别让 CP3 每个新端点各自发明形状。**
 
-- [ ] **MED-7 — `docs/07 §1` 承诺的站点级 `frame-src` CSP 未实现（纵深防御缺口，非红线）**
+- [x] **MED-7 — `docs/07 §1` 承诺的站点级 `frame-src` CSP 未实现（纵深防御缺口，非红线）**
   - 证据：`docs/07:12` vs `next.config.ts:3-8`（无 `headers()`）、无 `src/middleware.ts`、`layout.tsx` 无 CSP。主隔离 sandbox 在。
   - 修法：加 `headers()` CSP `frame-src http://localhost:9000; frame-ancestors 'none'`（源走 env），或把 docs/07 §1 标〔设计/未实现〕。
 
-- [ ] **MED-8 — minio-init 并未设 CORS，但 `docs/01:64` & `docs/06:68` 说它设了**
+- [x] **MED-8 — minio-init 并未设 CORS，但 `docs/01:64` & `docs/06:68` 说它设了**
   - 证据：`docker/minio-init.sh:25,28,32` 只做 mb/anonymous/cp；CORS 实际由 `docker-compose.yml:46` `MINIO_API_CORS_ALLOW_ORIGIN` 设。
   - 修法：把 `docs/01:64`、`docs/06:68` 改为「CORS 由 compose 的 `MINIO_API_CORS_ALLOW_ORIGIN`（限 app 源）提供」。
 
@@ -102,13 +102,13 @@ CP1 是一次高质量、没有取巧的实现。所有问题都是 MED/LOW，**
 ## 4. ⚪ 可选打磨（LOW，不急，CP2 顺手即可）
 
 - [ ] LOW-1 `HOST_INIT` 声明但宿主从不发/游戏自启 — `docs/06:37`、`play-messages.ts:30`、`PlayShell.tsx:121`、`game.js:247`。修：onload 后发 HOST_INIT，或把它在 docs/06 降为 OPTIONAL/CP2。
-- [ ] LOW-2 `.env.example:21-22` `S3_ENDPOINT` 注释与值小冲突（compose 覆盖为 `minio:9000`）。修：改注释说明该值用于裸跑、compose 注入 `minio:9000`。
-- [ ] LOW-3 错误体未走 Zod（`active-version.ts:17,31`）— 与 MED-6 一起做。
-- [ ] LOW-4 `docs/10:78` 写 `next/font/google`，实际 `next/font/local`（`layout.tsx:2`，代码更对）。修：改文档。
-- [ ] LOW-5 `--input` token 文档有（`docs/10:77`）但 `globals.css` 未定义。修：加 `--input: var(--border);`。
-- [ ] LOW-6 `StatePill` 的 `ended` 态未进 `docs/10:66` 规格（`StatePill.tsx:3-8`）。修：补一行。
-- [ ] LOW-7 `createdAt: z.string()` 未强制 ISO8601（`manifest.ts:60` vs `docs/05:48`）。修：可选 `z.string().datetime()`。
-- [ ] LOW-8 relPath 守卫允许 `./` 前缀（`manifest.ts:18-21`）— CP2 生成 manifest 时的隐患，seed 路径干净。修：也拒 `./`。
+- [x] LOW-2 `.env.example:21-22` `S3_ENDPOINT` 注释与值小冲突（compose 覆盖为 `minio:9000`）。修：改注释说明该值用于裸跑、compose 注入 `minio:9000`。
+- [x] LOW-3 错误体未走 Zod（`active-version.ts:17,31`）— 与 MED-6 一起做。
+- [x] LOW-4 `docs/10:78` 写 `next/font/google`，实际 `next/font/local`（`layout.tsx:2`，代码更对）。修：改文档。
+- [x] LOW-5 `--input` token 文档有（`docs/10:77`）但 `globals.css` 未定义。修：加 `--input: var(--border);`。
+- [x] LOW-6 `StatePill` 的 `ended` 态未进 `docs/10:66` 规格（`StatePill.tsx:3-8`）。修：补一行。
+- [x] LOW-7 `createdAt: z.string()` 未强制 ISO8601（`manifest.ts:60` vs `docs/05:48`）。修：可选 `z.string().datetime()`。
+- [x] LOW-8 relPath 守卫允许 `./` 前缀（`manifest.ts:18-21`）— CP2 生成 manifest 时的隐患，seed 路径干净。修：也拒 `./`。
 - [ ] LOW-9 watchdog 15s 会把慢但合法的冷启动游戏判 `failed`（`PlayShell.tsx:14`）— 显示重试卡非白屏，仅调参提示。
 - [ ] LOW-10 `.dockerignore` 把 `*.md`/`docs/` 排除出镜像（`:13-14`）— 故意/正确，仅记录。
 - [ ] LOW-11 提交时间戳成对相同（cosmetic）；scaffold+eslint 守卫标 `chore` 虽承载 Fatal #1 守卫 — cosmetic，≥3 commit 已满足（8 个、全 Conventional、全带 Co-Authored-By）。

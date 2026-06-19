@@ -27,9 +27,14 @@ mc mb --ignore-existing "${ALIAS}/${BUCKET}"
 # 2) public read on games/* ONLY (uploads/* stays private). Enables unsigned cross-origin iframe nav.
 mc anonymous set download "${ALIAS}/${BUCKET}/games"
 
-# 3) seed bundle (bind-mounted at /seed) → games/neon-dodger/1/
-echo "[minio-init] uploading seed bundle ..."
-mc cp --recursive /seed/games/neon-dodger/1/ "${ALIAS}/${BUCKET}/games/neon-dodger/1/"
+# 3) seed bundles (bind-mounted at /seed) → games/<slug>/<ver>/  (遍历，支持多个预制游戏)
+echo "[minio-init] uploading seed bundles ..."
+for dir in /seed/games/*/*/; do
+  rel="${dir#/seed/}" # games/<slug>/<ver>/
+  rel="${rel%/}"
+  echo "  -> ${rel}/"
+  mc cp --recursive "${dir}" "${ALIAS}/${BUCKET}/${rel}/"
+done
 
 echo "[minio-init] bucket contents:"
 mc ls --recursive "${ALIAS}/${BUCKET}/games"

@@ -56,13 +56,13 @@
 
 | 服务 | 镜像/构建 | 端口 | 职责 |
 |------|-----------|:----:|------|
-| `web` | 本仓 Dockerfile | 3000 | Next.js（UI + API），启动时跑 `prisma migrate deploy` |
+| `web` | 本仓 Dockerfile（runner） | 3000 | Next.js（UI + API）；**不**跑 migrate，gated 于 `seed` 完成后（slim runner 无 prisma CLI） |
 | `worker` | 同镜像，不同 command | — | BullMQ 消费 + Agent 状态机 |
 | `db` | postgres:16 | 5432 | 数据库 |
 | `redis` | redis:7 | 6379 | 队列 + pub/sub |
 | `minio` | minio/minio | 9000 / 9001 | S3 兼容对象存储 + 控制台 |
-| `minio-init` | minio/mc（一次性） | — | 建桶 `yahaha`、设 CORS、设公共读前缀、预置 seed bundle |
-| `seed` | 同 web 镜像（一次性，依赖健康检查） | — | 迁移后插入 ≥3 游戏并**真跑一次 Create pipeline** 产出 ≥1 个 |
+| `minio-init` | minio/mc（一次性） | — | 建桶 `yahaha`、设公共读前缀（`games/*`）、上传 seed bundles（CORS 由 `minio` 服务 env `MINIO_API_CORS_ALLOW_ORIGIN` 提供，非此处） |
+| `seed` | 本仓 Dockerfile `target: builder`（一次性，含 prisma CLI/tsx） | — | `prisma migrate deploy` + 插预制游戏（CP2：2 个；CP4 扩到 ≥3 并**真跑一次 Create pipeline** 产出 ≥1 个） |
 
 **迁移到真实 OSS**：仅改 `S3_ENDPOINT/S3_PUBLIC_ENDPOINT/凭证/S3_FORCE_PATH_STYLE=false`，代码零改动（MinIO 说 S3 协议）。
 

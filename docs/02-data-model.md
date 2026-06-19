@@ -12,10 +12,14 @@
 | `TaskStatus` | `PENDING` · `RUNNING` · `SUCCEEDED` · `FAILED` · `CANCELED` |
 | `AgentName` | `INGEST` · `PLANNER` · `ASSET_CURATOR` · `CODER` · `VALIDATOR` · `PACKAGER` |
 | `AssetKind` | `UPLOAD` · `GENERATED` · `COVER` |
-| `RuntimeKind` | `HTML5_CANVAS` · `PHASER3` |
+| `RuntimeKind` | `HTML5_CANVAS` · `PHASER3`（wire 值 `html5-canvas`/`phaser3`，见下方命名规范注） |
 | `AuthProvider` | `CREDENTIALS` · `GOOGLE` · `GITHUB` |
 | `PlayEventType` | `LOAD` · `START` · `END` · `ERROR` |
 | `LogLevel` | `INFO` · `WARN` · `ERROR` |
+
+> **RuntimeKind 命名规范（MED-5，接 Prisma 前硬约束）**：DB/Prisma 用大写下划线符号 `HTML5_CANVAS`/`PHASER3`，
+> 经 Prisma `@map("html5-canvas")`/`@map("phaser3")` 落库为 **wire 值**（小写连字符）；wire 值是 manifest/API/postMessage/seed
+> 的唯一对外形态。代码侧单一真源 = `src/lib/contracts/runtime.ts`（`RUNTIME_DB_TO_WIRE` / `RUNTIME_WIRE_TO_DB` 映射）。
 
 ## 实体
 
@@ -58,6 +62,8 @@
 | createdAt / updatedAt | DateTime | |
 | publishedAt | DateTime? | 首次发布时间（卡片"发布时间"） |
 关系：`versions Version[]`、`likes Like[]`、`favorites Favorite[]`、`playEvents PlayEvent[]`、`tasks GenerationTask[]`。
+索引：`@@index([status, publishedAt])`（撑 Home 已发布列表查询）。
+Prisma 命名关系（消歧 Game↔Version 的两条边）：`versions`↔`Version.game` = `@relation("GameVersions")`（一对多历史版本，FK 在 `Version.gameId`）；`activeVersion`（FK `activeVersionId`）↔`Version.activeForGame` = `@relation("ActiveVersion")`（一对一当前/已发布版本）。
 
 ### Version（不可变版本，支撑版本管理/Remix/回滚）
 | 字段 | 类型 | 约束/说明 |

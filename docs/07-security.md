@@ -8,8 +8,8 @@
 - **浏览器隔离**：生成的任意 JS **只**在跨域 sandbox iframe 运行（`allow-scripts`，无 `allow-same-origin` → opaque origin），无法触达宿主 cookie/token/DOM/localStorage。见 `06`。
 - **产物 CSP**：manifest 自带 `connect-src 'none'`，阻断游戏外联/数据外泄；`default-src 'none'` 收紧默认。
 - **服务端从不执行生成代码**：worker 只做静态校验/打包，可选 headless 渲染在受限无网容器内（截图用）。
-- **postMessage 校验**：宿主只接受来自 MinIO 源、`source:"yahaha-game"` 且 schema 合法的消息。
-- 宿主 app 设站点级 CSP，限制 `frame-src` 为 MinIO 源。
+- **postMessage 校验**：宿主按 **`event.source` 身份**（= 所挂 iframe 的 `contentWindow`）+ **先 Zod 校验外层信封**（`source:"yahaha-game"`、`v:1`）再 switch type；sandbox 帧 origin 为 `"null"`，**绝不**按 origin 断言。详见 `06`。
+- **站点级 CSP（已实现）**：`next.config.ts` `headers()` 下发 `frame-src 'self' <S3_PUBLIC_ENDPOINT>; frame-ancestors 'none'`（源走 env），限制可嵌入 iframe 的源为 MinIO 产物源，并禁止本站被他人内嵌。
 
 ## 2. 上传素材
 
