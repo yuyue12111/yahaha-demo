@@ -36,8 +36,9 @@ export async function runGeneration(taskId: string): Promise<void> {
     model,
   };
 
+  // MED-6（纵深）：worker 侧 asset 查询也按 ownerId 作用域，绝不读他人字节。
   const assetRows = ctx.assetIds.length
-    ? await prisma.asset.findMany({ where: { id: { in: ctx.assetIds } } })
+    ? await prisma.asset.findMany({ where: { id: { in: ctx.assetIds }, ownerId: ctx.userId } })
     : [];
   const assetRefs: AssetRef[] = assetRows.map((a) => ({
     assetId: a.id,

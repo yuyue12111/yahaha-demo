@@ -44,6 +44,20 @@ export async function POST(req: Request) {
     }
   }
 
+  // MED-6：校验上传素材归属 —— 禁止引用他人/不存在的 assetId（IDOR / 存在性预言机，docs/07 §2 按用户隔离）。
+  if (assetIds && assetIds.length > 0) {
+    const ids = [...new Set(assetIds)];
+    const owned = await prisma.asset.count({
+      where: { id: { in: ids }, ownerId: session.user.id },
+    });
+    if (owned !== ids.length) {
+      return NextResponse.json(
+        errorEnvelope("FORBIDDEN", "包含非本人或不存在的素材"),
+        { status: 403 },
+      );
+    }
+  }
+
   const task = await prisma.generationTask.create({
     data: {
       userId: session.user.id,
