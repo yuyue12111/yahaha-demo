@@ -1,0 +1,239 @@
+// 数据模型权威源 = docs/02-data-model.md。字段名/枚举跨代码必须一致。
+// CP2 实际使用 User/Account/Game/Version；其余表先建好，CP3（Create 流水线）再填。
+
+generator client {
+  provider      = "prisma-client-js"
+  // alpine(node:22-alpine, openssl3, musl) 需要 musl 目标的 library 引擎；native 供本机开发
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== 枚举（docs/02 §枚举）=====
+enum GameStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VersionStatus {
+  BUILDING
+  PREVIEW
+  PUBLISHED
+  FAILED
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum AgentName {
+  INGEST
+  PLANNER
+  ASSET_CURATOR
+  CODER
+  VALIDATOR
+  PACKAGER
+}
+
+enum AssetKind {
+  UPLOAD
+  GENERATED
+  COVER
+}
+
+// MED-5：DB 符号大写下划线，经 @map 落库为 wire 值（与 src/lib/contracts/runtime.ts 一致）
+enum RuntimeKind {
+  HTML5_CANVAS @map("html5-canvas")
+  PHASER3      @map("phaser3")
+}
+
+enum AuthProvider {
+  CREDENTIALS
+  GOOGLE
+  GITHUB
+}
+
+enum PlayEventType {
+  LOAD
+  START
+  END
+  ERROR
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+// ===== 实体 =====
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  passwordHash String?
+  displayName  String
+  avatarUrl    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  games        Game[]
+  accounts     Account[]
+  assets       Asset[]
+  tasks        GenerationTask[]
+  likes        Like[]
+  favorites    Favorite[]
+}
+
+model Account {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          AuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         Int?
+  createdAt         DateTime     @default(now())
+
+  @@unique([provider, providerAccountId])
+}
+
+model Game {
+  id              String           @id @default(cuid())
+  title           String
+  slug            String?          @unique
+  summary         String
+  tags            String[]
+  coverUrl        String?
+  authorId        String
+  author          User             @relation(fields: [authorId], references: [id])
+  status          GameStatus       @default(DRAFT)
+  activeVersionId String?          @unique
+  activeVersion   Version?         @relation("ActiveVersion", fields: [activeVersionId], references: [id])
+  playCount       Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  publishedAt     DateTime?
+  versions        Version[]        @relation("GameVersions")
+  likes           Like[]
+  favorites       Favorite[]
+  playEvents      PlayEvent[]
+  tasks           GenerationTask[]
+  assets          Asset[]
+
+  @@index([status, publishedAt])
+}
+
+model Version {
+  id              String        @id @default(cuid())
+  gameId          String
+  game            Game          @relation("GameVersions", fields: [gameId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  runtime         RuntimeKind
+  manifestKey     String
+  manifestUrl     String
+  status          VersionStatus @default(BUILDING)
+  createdByTaskId String? // FK→GenerationTask（CP3 正式关联）
+  createdAt       DateTime      @default(now())
+  activeForGame   Game?         @relation("ActiveVersion")
+  playEvents      PlayEvent[]
+
+  @@unique([gameId, versionNumber])
+}
+
+model Asset {
+  id               String    @id @default(cuid())
+  ownerId          String
+  owner            User      @relation(fields: [ownerId], references: [id])
+  gameId           String?
+  game             Game?     @relation(fields: [gameId], references: [id])
+  kind             AssetKind
+  s3Key            String
+  url              String?
+  contentType      String
+  bytes            Int
+  originalFilename String?
+  createdAt        DateTime  @default(now())
+}
+
+model GenerationTask {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id])
+  gameId          String?
+  game            Game?      @relation(fields: [gameId], references: [id])
+  prompt          String
+  inputAssetIds   String[]
+  status          TaskStatus @default(PENDING)
+  currentStep     AgentName?
+  modelProvider   String?
+  attempt         Int        @default(0)
+  error           String?
+  resultVersionId String? // FK→Version（CP3 正式关联）
+  createdAt       DateTime   @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  logs            AgentLog[]
+}
+
+model AgentLog {
+  id            String         @id @default(cuid())
+  taskId        String
+  task          GenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  seq           Int
+  agentName     AgentName
+  level         LogLevel       @default(INFO)
+  title         String
+  inputSummary  String?
+  outputSummary String?
+  tokensIn      Int?
+  tokensOut     Int?
+  latencyMs     Int?
+  createdAt     DateTime       @default(now())
+
+  @@index([taskId, seq])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, gameId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, gameId])
+}
+
+model PlayEvent {
+  id         String        @id @default(cuid())
+  gameId     String
+  game       Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  versionId  String?
+  version    Version?      @relation(fields: [versionId], references: [id])
+  userId     String?
+  type       PlayEventType
+  score      Int?
+  durationMs Int?
+  createdAt  DateTime      @default(now())
+
+  @@index([gameId, type])
+}
