@@ -22,7 +22,15 @@
 
 ## postMessage 协议（version 1；与 manifest.postMessageContract 一致）
 
-宿主与游戏**只**经 postMessage 通信，双向都校验 `origin`（宿主侧允许 MinIO 源）与消息 schema。
+宿主与游戏**只**经 postMessage 通信，双向都校验**消息来源**与消息 schema（Zod 校验外层信封）。
+
+**来源校验（关键，易踩坑）**：`sandbox="allow-scripts"`**不带** `allow-same-origin` ⇒ iframe 文档处于
+**opaque/null origin**，它 `postMessage` 到父页时 `event.origin` 为字符串 `"null"`（**不是** MinIO 源）。
+因此宿主**必须**以 `event.source === iframeEl.contentWindow`（承重校验）+ 接受 `event.origin === "null"` 来鉴别，
+**绝不**断言 `event.origin === "http://localhost:9000"`（那样会拒掉所有合法消息，游戏永远停在 `loading`）。
+父页→游戏发消息只能用 `targetOrigin: "*"`（无法指名 null origin；因 iframe 已隔离且不传密钥，安全可接受）。
+收到消息先按信封 `{source:"yahaha-game", v:1}` 过滤（`source` 不符或 `v!==1` 直接丢弃）再 switch `type`。
+看护超时（默认 15s）在收到 `GAME_LOADED` 时清除；超时未就绪 → `failed`，绝不白屏。
 
 | 方向 | type | payload | 含义 |
 |------|------|---------|------|
