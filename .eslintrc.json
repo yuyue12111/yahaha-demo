@@ -1,0 +1,24 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          { "name": "fs", "message": "Fatal #1 guard: fs / object-storage access is only allowed in src/lib/storage.ts." },
+          { "name": "fs/promises", "message": "Fatal #1 guard: fs access is only allowed in src/lib/storage.ts." },
+          { "name": "node:fs", "message": "Fatal #1 guard: fs access is only allowed in src/lib/storage.ts." },
+          { "name": "node:fs/promises", "message": "Fatal #1 guard: fs access is only allowed in src/lib/storage.ts." },
+          { "name": "@aws-sdk/client-s3", "message": "Fatal #1 guard: the S3 client is only allowed in src/lib/storage.ts." },
+          { "name": "@aws-sdk/s3-request-presigner", "message": "Fatal #1 guard: S3 presigning is only allowed in src/lib/storage.ts." }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/storage.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}

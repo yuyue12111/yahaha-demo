@@ -1,0 +1,1 @@
+# Site-only static assets. ★ NEVER place game artifacts here — they must live in MinIO (Fatal #1/#2).
