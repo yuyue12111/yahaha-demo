@@ -7,7 +7,7 @@ type Size = "sm" | "md" | "lg";
 
 const VARIANT: Record<Variant, string> = {
   play: "bg-grad-play text-white font-bold rounded-pill hover:brightness-110",
-  create: "bg-grad-create text-[#04223A] font-bold rounded-pill hover:brightness-110",
+  create: "bg-grad-create text-[color:var(--grad-create-fg)] font-bold rounded-pill hover:brightness-110",
   primary: "bg-ink text-bg font-bold rounded-pill hover:brightness-95",
   ghost: "border border-hairline-strong text-ink-muted hover:text-ink rounded-lg",
 };

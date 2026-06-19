@@ -23,6 +23,7 @@
   /* brand gradients (双招牌：洋红→紫 = Play/消费；青→蓝 = Create/AI) */
   --grad-play: linear-gradient(135deg, #ff3ba7, #c03bff);
   --grad-create: linear-gradient(135deg, #27e0ff, #3b82f6);
+  --grad-create-fg: #04223a; /* 青底用深字（docs/10:33） */
 
   /* status (映射 TaskStatus / Play 状态) */
   --ok: #5de2b0;

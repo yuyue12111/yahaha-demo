@@ -62,6 +62,8 @@
 | createdAt / updatedAt | DateTime | |
 | publishedAt | DateTime? | 首次发布时间（卡片"发布时间"） |
 关系：`versions Version[]`、`likes Like[]`、`favorites Favorite[]`、`playEvents PlayEvent[]`、`tasks GenerationTask[]`。
+索引：`@@index([status, publishedAt])`（撑 Home 已发布列表查询）。
+Prisma 命名关系（消歧 Game↔Version 的两条边）：`versions`↔`Version.game` = `@relation("GameVersions")`（一对多历史版本，FK 在 `Version.gameId`）；`activeVersion`（FK `activeVersionId`）↔`Version.activeForGame` = `@relation("ActiveVersion")`（一对一当前/已发布版本）。
 
 ### Version（不可变版本，支撑版本管理/Remix/回滚）
 | 字段 | 类型 | 约束/说明 |
