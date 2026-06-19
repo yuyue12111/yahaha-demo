@@ -1,0 +1,6 @@
+# pnpm 11 gates package build scripts by default. Allow these native postinstalls:
+#   sharp         — optional next/image image optimizer
+#   unrs-resolver — eslint import resolver used by eslint-config-next
+allowBuilds:
+  sharp: true
+  unrs-resolver: true

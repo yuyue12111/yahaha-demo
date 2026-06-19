@@ -12,6 +12,11 @@ node_modules/
 out/
 dist/
 build/
+next-env.d.ts
+*.tsbuildinfo
+
+# claude code local dev config (preview launch.json etc.)
+.claude/
 
 # prisma
 prisma/*.db

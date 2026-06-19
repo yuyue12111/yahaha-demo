@@ -1,0 +1,94 @@
+name: yahaha
+
+# One command — `docker compose up --build` — brings up the whole CP1 stack:
+# postgres + redis + minio, a one-shot minio-init (bucket / public-read / seed bundle),
+# then web (Next.js) gated on the seed being present.
+#
+# Dual S3 endpoint is load-bearing: the web container reaches MinIO at the in-network
+# host `minio:9000` (S3_ENDPOINT), but bakes the browser-reachable `localhost:9000`
+# (S3_PUBLIC_ENDPOINT) into Play URLs. Do NOT collapse them.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: yahaha
+      POSTGRES_PASSWORD: yahaha
+      POSTGRES_DB: yahaha
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yahaha -d yahaha"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z # pinned for reproducible `docker compose up` (Fatal #5)
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      # Broadly-supported CORS for future client-side fetch (manifest/integrity). Not needed for
+      # the CP1 happy path (iframe nav + same-origin-within-frame + server-side manifest validate).
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:3000"
+    ports:
+      - "9000:9000" # S3 API — the cross-origin artifact/sandbox source
+      - "9001:9001" # console (minioadmin / minioadmin)
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    # digest-pinned (mc ~2025-08-06) — its tag scheme is ambiguous; digest is reproducible (Fatal #5)
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on:
+      - minio
+    volumes:
+      - ./seed:/seed:ro
+      - ./docker/minio-init.sh:/scripts/minio-init.sh:ro
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      S3_BUCKET: yahaha
+    entrypoint: ["/bin/sh", "/scripts/minio-init.sh"]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully # bucket + seed present before first request
+    environment:
+      NODE_ENV: production
+      # dual endpoint — server uses the service name, browser uses localhost
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET: yahaha
+      S3_FORCE_PATH_STYLE: "true"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # forward-compat (unused in CP1; web does not connect to db/redis yet)
+      DATABASE_URL: postgresql://yahaha:yahaha@db:5432/yahaha?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:
+  minio-data:

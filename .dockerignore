@@ -1,0 +1,16 @@
+# Secret-leak guard + slim build context
+.env
+.env.local
+.env.*.local
+node_modules
+.next
+.git
+.gitignore
+.DS_Store
+*.log
+.minio-data
+seed
+docs
+*.md
+.claude
+.obsidian

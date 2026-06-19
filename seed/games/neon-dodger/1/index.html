@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- CSP is enforced HERE (MinIO serves static objects without a CSP header). connect-src 'none' blocks exfiltration. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'"
+    />
+    <title>Neon Dodger</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0c0a14;
+        overflow: hidden;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      #game-root {
+        width: 100vw;
+        height: 100vh;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- CODER contract: mount to #game-root, autosize to the iframe -->
+    <div id="game-root"><canvas id="c"></canvas></div>
+    <script src="./game.js"></script>
+  </body>
+</html>

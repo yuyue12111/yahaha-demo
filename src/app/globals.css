@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Design tokens — authoritative source (docs/10-design-system.md §1).
+   Tailwind theme + (future) shadcn/ui both read these vars.
+   Single dark theme; no light variant.
+   ========================================================================= */
+:root {
+  /* surface / text / border */
+  --bg: #0c0a14;
+  --surface: #16121f;
+  --surface-2: #1e1830;
+  --surface-inset: #100c18;
+  --text: #f4f1fa;
+  --text-muted: #9d95b0;
+  --text-faint: #7a7290;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-brand: rgba(124, 92, 255, 0.18);
+
+  /* brand gradients (双招牌：洋红→紫 = Play/消费；青→蓝 = Create/AI) */
+  --grad-play: linear-gradient(135deg, #ff3ba7, #c03bff);
+  --grad-create: linear-gradient(135deg, #27e0ff, #3b82f6);
+
+  /* status (映射 TaskStatus / Play 状态) */
+  --ok: #5de2b0;
+  --running: #27e0ff;
+  --pending: #9d95b0;
+  --warn: #f6b73c;
+  --danger: #ff5c7a;
+  --canceled: #7a7290;
+
+  /* radius */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --r-pill: 999px;
+
+  /* fonts — --font-sans is injected by next/font (see layout.tsx); mono is a stack */
+  --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+
+  /* shadcn/ui variable mapping (forward-compat, docs/10 §3 — wired now so shadcn drops in later) */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --popover: var(--surface);
+  --primary: #c03bff;
+  --primary-foreground: #ffffff;
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  --ring: #27e0ff;
+  --destructive: var(--danger);
+  --radius: 12px;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* accessible focus ring (docs/10 §焦点环) */
+  :where(a, button, input, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(39, 224, 255, 0.6);
+  }
+}
