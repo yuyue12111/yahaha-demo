@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="600" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16121F" />
+      <stop offset="1" stop-color="#0C0A14" />
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#FF3BA7" />
+      <stop offset="1" stop-color="#C03BFF" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b" />
+      <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+  </defs>
+  <rect width="600" height="800" fill="url(#bg)" />
+  <g stroke="rgba(124,92,255,0.10)" stroke-width="1">
+    <path d="M0 200H600M0 320H600M0 440H600" />
+  </g>
+  <g fill="#27E0FF" filter="url(#glow)">
+    <path d="M180 150l13 27 30 3-22 21 6 30-27-15-27 15 6-30-22-21 30-3z" />
+    <path d="M410 250l11 22 25 3-18 17 5 25-23-13-23 13 5-25-18-17 25-3z" />
+    <path d="M300 360l10 20 22 2-16 15 4 22-20-11-20 11 4-22-16-15 22-2z" />
+  </g>
+  <rect x="232" y="600" width="136" height="22" rx="9" fill="url(#bar)" filter="url(#glow)" />
+  <text x="48" y="730" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="800" font-size="44" fill="#F4F1FA">Star Catcher</text>
+  <text x="48" y="766" font-family="ui-monospace, monospace" font-size="18" fill="#9D95B0">html5-canvas · catch the stars</text>
+</svg>

@@ -66,13 +66,34 @@ services:
       S3_BUCKET: yahaha
     entrypoint: ["/bin/sh", "/scripts/minio-init.sh"]
 
+  # 一次性：迁移 + 插入预制游戏（builder 镜像含 prisma CLI + tsx）。web gated 其后。
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://yahaha:yahaha@db:5432/yahaha?schema=public
+      S3_PUBLIC_ENDPOINT: http://localhost:9000 # coverUrl/manifestUrl 必须浏览器可达
+      S3_BUCKET: yahaha
+    command: ["sh", "-c", "pnpm prisma migrate deploy && pnpm tsx prisma/seed.ts"]
+
   web:
     build:
       context: .
       dockerfile: Dockerfile
     depends_on:
+      db:
+        condition: service_healthy
       minio-init:
-        condition: service_completed_successfully # bucket + seed present before first request
+        condition: service_completed_successfully # bucket + Play 产物就位
+      seed:
+        condition: service_completed_successfully # DB schema + 预制数据就位
     environment:
       NODE_ENV: production
       # dual endpoint — server uses the service name, browser uses localhost
@@ -84,9 +105,18 @@ services:
       S3_BUCKET: yahaha
       S3_FORCE_PATH_STYLE: "true"
       NEXT_PUBLIC_APP_URL: http://localhost:3000
-      # forward-compat (unused in CP1; web does not connect to db/redis yet)
       DATABASE_URL: postgresql://yahaha:yahaha@db:5432/yahaha?schema=public
       REDIS_URL: redis://redis:6379
+      # NextAuth：本地 demo 用 dev secret（非真密钥；可被 .env 覆盖）。AUTH_TRUST_HOST 防 UntrustedHost。
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-not-for-production-change-me-0000}
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     ports:
       - "3000:3000"
 
