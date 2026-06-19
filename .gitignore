@@ -27,3 +27,6 @@ coverage/
 
 # minio local data (if mounted)
 .minio-data/
+
+# provided spec — keep local as reference, NEVER publish to the remote
+yahaha项目文档.md
