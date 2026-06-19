@@ -37,6 +37,9 @@ export function CreateStudio() {
   const [logsByAgent, setLogsByAgent] = useState<Partial<Record<AgentName, AgentLogDTO>>>({});
   const [done, setDone] = useState<TaskDoneData | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const esRef = useRef<EventSource | null>(null);
   useEffect(() => () => esRef.current?.close(), []);
@@ -88,7 +91,32 @@ export function CreateStudio() {
     setLogsByAgent({});
     setRunningAgent(null);
     setTaskStatus("PENDING");
+    setPublished(false);
+    setPublishError(null);
   };
+
+  // ---- 发布：闭合 create→publish→Home（docs/03:33）----
+  const publish = useCallback(async () => {
+    if (!done?.gameId || !done.versionId || publishing) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const res = await fetch(`/api/games/${done.gameId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ versionId: done.versionId }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => null);
+        throw new Error(e?.error?.message ?? `发布失败 ${res.status}`);
+      }
+      setPublished(true);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPublishing(false);
+    }
+  }, [done, publishing]);
 
   // ---- 上传：presign → 浏览器直传 MinIO（绝不经 app）----
   const onFiles = useCallback(async (files: FileList | null) => {
@@ -320,6 +348,40 @@ export function CreateStudio() {
               runtime={done.runtime}
               versionNumber={done.versionNumber}
             />
+            <div className="mt-4 border-t border-hairline pt-3">
+              {published ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[13px] font-medium" style={{ color: "var(--ok)" }}>
+                    ✓ 已发布到首页
+                  </span>
+                  <div className="flex gap-2">
+                    <Button href="/" variant="ghost" size="sm">
+                      去首页
+                    </Button>
+                    {done.gameId ? (
+                      <Button href={`/play/${done.gameId}`} variant="play" size="sm">
+                        立即游玩
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] text-ink-muted">满意？发布后所有人可在首页玩到。</span>
+                  <Button
+                    variant="create"
+                    size="sm"
+                    onClick={() => void publish()}
+                    disabled={publishing}
+                  >
+                    {publishing ? "发布中…" : "发布到首页"}
+                  </Button>
+                </div>
+              )}
+              {publishError ? (
+                <p className="mt-2 text-[12px] text-danger">{publishError}</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </section>
