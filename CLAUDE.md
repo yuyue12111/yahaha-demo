@@ -19,6 +19,7 @@
   ③ 每个 Agent 节点做成可重试 durable step + Create UI run-timeline 视图。
 - **交付目标**：本地 `docker compose up` 可复现为**唯一**交付；公网 URL 不在范围（仅大幅领先时作可选 stretch）。
 - 详见 `docs/01-architecture.md` 的技术栈表。
+- **视觉基调**：方向 A 霓虹街机为底 + B 的克制（暗色 plum、双渐变 Play/Create、星形 logo）；token 见 `docs/10-design-system.md`。
 
 ## 2. 五条 Fatal 雷区与守卫（绝不能踩 = 3.4 倒读）
 
@@ -60,6 +61,7 @@ README + `.env.example`（无密钥）+ 一条 compose · session 抗 F5。
 | 安全方案 | `docs/07-security.md` | 隔离、注入、任意代码执行、密钥、限额、上传 |
 | 可观测性 / 失败恢复 | `docs/08-observability-and-failure-recovery.md` | 日志、Agent IO、任务态、恢复矩阵 |
 | 工程约定 | `docs/09-conventions.md` | 目录结构、命名、代码规则、提交规范 |
+| 设计系统 / 视觉基调 | `docs/10-design-system.md` | 颜色/渐变/圆角/字体/组件 token（→ Tailwind theme + shadcn） |
 
 ## 5. 权威命名（跨所有文件与代码必须一致）
 
