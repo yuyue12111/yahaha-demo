@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="600" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16121F" />
+      <stop offset="1" stop-color="#0C0A14" />
+    </linearGradient>
+    <linearGradient id="play" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FF3BA7" />
+      <stop offset="1" stop-color="#C03BFF" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="b" />
+      <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+  </defs>
+  <rect width="600" height="800" fill="url(#bg)" />
+  <g stroke="rgba(124,92,255,0.10)" stroke-width="1">
+    <path d="M120 0V800M240 0V800M360 0V800M480 0V800" />
+  </g>
+  <g filter="url(#glow)">
+    <rect x="150" y="150" width="90" height="34" rx="6" fill="#27E0FF" />
+    <rect x="360" y="250" width="70" height="30" rx="6" fill="#FF3BA7" />
+    <rect x="230" y="330" width="110" height="32" rx="6" fill="#27E0FF" />
+  </g>
+  <rect x="276" y="600" width="52" height="52" rx="12" fill="url(#play)" filter="url(#glow)" />
+  <text x="48" y="730" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="800" font-size="46" fill="#F4F1FA">Neon Dodger</text>
+  <text x="48" y="766" font-family="ui-monospace, monospace" font-size="18" fill="#9D95B0">html5-canvas · dodge the neon</text>
+</svg>
