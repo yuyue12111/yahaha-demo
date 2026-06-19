@@ -59,7 +59,12 @@ async function seedCreateGame(authorId: string): Promise<void> {
   if (done?.status !== "SUCCEEDED" || !done.gameId || !done.resultVersionId) {
     throw new Error(`Create pipeline failed: ${done?.error ?? "unknown"}`);
   }
-  await publishGameVersion({ gameId: done.gameId, versionId: done.resultVersionId, userId: authorId });
+  const pub = await publishGameVersion({
+    gameId: done.gameId,
+    versionId: done.resultVersionId,
+    userId: authorId,
+  });
+  if (!pub.ok) throw new Error(`publish failed: ${pub.error}`); // 守卫：发布失败硬失败，防 <3 已发布回归
   console.log(`[seed] Create game generated + published: ${done.gameId}`);
 }
 

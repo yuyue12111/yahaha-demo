@@ -25,7 +25,7 @@ docker compose up --build
 - 应用首页：<http://localhost:3000>
 - MinIO 控制台：<http://localhost:9001>（`minioadmin` / `minioadmin`）
 - **无需真实模型 key，无需先 `cp .env.example .env`**：compose 已注入所需 env，缺省 `mock` 模式离线跑通整条链路。
-- 预置账号（可直接登录体验发布/Remix）：`studio@yahaha.dev` / `yahaha-demo`。
+- 预置账号（可直接登录体验发布）：`studio@yahaha.dev` / `yahaha-demo`。
 - 接真实模型：填 `.env` 的 `MODEL_PROVIDER` + `MODEL_BASE_URL` + `MODEL_API_KEY`（OpenAI 兼容），`docker compose up -d worker` 重启 worker 即生效（seed 恒用 mock 以保可复现）。
 
 ## 核心链路验证（<5 分钟演示脚本）
@@ -103,4 +103,4 @@ docker compose up --build
 
 ## 提交与协作
 
-Conventional Commits；逐 checkpoint 有意义提交（≥3）。协作打法见 [`协作打法.md`](协作打法.md)（如有）。本地验证以 `docker compose up` 为准。
+Conventional Commits；逐 checkpoint 有意义提交（≥3）。协作打法见 [`协作打法.md`](协作打法.md)。本地验证以 `docker compose up` 为准。
