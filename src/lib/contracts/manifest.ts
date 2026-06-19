@@ -7,8 +7,21 @@ export const RUNTIME_KINDS = ["html5-canvas", "phaser3"] as const;
 export const RuntimeKind = z.enum(RUNTIME_KINDS);
 export type RuntimeKind = z.infer<typeof RuntimeKind>;
 
+/**
+ * A relative, prefix-local artifact path. These get concatenated into MinIO keys / the iframe
+ * src + Source badge, so the read-side validator forbids leading "/", ".." traversal, and URL
+ * schemes — a defense-in-depth guard for when manifests are machine-generated (CP2+).
+ */
+const relPath = z
+  .string()
+  .min(1)
+  .refine(
+    (p) => !p.startsWith("/") && !p.includes("..") && !/^[a-zA-Z][\w+.-]*:/.test(p),
+    { message: "must be a relative, prefix-local path (no leading '/', no '..', no URL scheme)" },
+  );
+
 export const ManifestFile = z.object({
-  path: z.string().min(1),
+  path: relPath,
   contentType: z.string().min(1),
   bytes: z.number().int().nonnegative().optional(),
   sha256: z.string().optional(),
@@ -16,7 +29,7 @@ export const ManifestFile = z.object({
 
 export const ManifestAsset = z.object({
   id: z.string().min(1),
-  path: z.string().min(1),
+  path: relPath,
   contentType: z.string().min(1),
   sourceUpload: z.string().optional(),
 });
@@ -37,7 +50,7 @@ export const Manifest = z.object({
   title: z.string().min(1),
   summary: z.string().default(""),
   runtime: RuntimeKind,
-  entry: z.string().min(1),
+  entry: relPath,
   controls: z.string().default(""),
   files: z.array(ManifestFile).min(1),
   assets: z.array(ManifestAsset).default([]),

@@ -50,6 +50,9 @@
     running = true;
     over = false;
     pushScore(true);
+    // Announce ready/resumed → host clears any ended/failed overlay and shows `loaded`.
+    // Covers both first boot AND local restart (space/click) so host + game never desync.
+    send("GAME_LOADED");
   }
 
   function pushScore(force) {
@@ -240,8 +243,7 @@
     requestAnimationFrame(loop);
   }
 
-  // ---- boot ----
+  // ---- boot ---- (reset() already emits GAME_LOADED)
   reset();
   requestAnimationFrame(loop);
-  send("GAME_LOADED");
 })();
