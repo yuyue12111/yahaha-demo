@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "../db";
 import { putObject, publicUrl } from "../storage";
 import { wireToDb } from "../contracts/runtime";
@@ -27,8 +27,11 @@ function deriveTags(spec: GameSpec): string[] {
 
 /**
  * PACKAGER —— 算哈希、组 manifest、上传 MinIO 版本化路径、写 Game(DRAFT)+Version(PREVIEW)。
- * 产物字节先**全量**写 MinIO，再写 Version 行（docs/08：避免半写）。manifest 写时过 Zod 校验。
- * 首次生成创建 Game（DRAFT，未发布）；产物可经 done 事件 entryUrl 直接预览，无需先发布（CP4 才发布）。
+ *
+ * MED-4 修复：**先上传后原子建库**。新游戏的 gameId 预生成（不先 INSERT），产物全量写 MinIO 后，
+ * 在**一个 `$transaction`** 内原子建 Game+Version（regen 则更新 coverUrl + 建 Version）。任何前序
+ * 失败（如 MinIO 抖动）只留无害的 MinIO 字节，**绝不留零-version 的 DRAFT 孤儿 Game**（docs/08:27）。
+ * manifest 写时过 Zod 校验。产物可经 done 事件 entryUrl 直接预览，无需先发布（CP4 才发布）。
  */
 export async function runPackager(
   ctx: AgentContext,
@@ -36,33 +39,23 @@ export async function runPackager(
   coder: CoderOutput,
   _validation: ValidationResult,
 ): Promise<NodeResult<PackageResult>> {
-  // 1) 确定 gameId + versionNumber（首次建 Game；regen 复用并 +1）。
-  let gameId = ctx.gameId;
+  // 1) 确定 gameId + versionNumber。新游戏**预生成** id 供上传前缀用（DB 行最后才原子建，MED-4）；
+  //    regen 复用 ctx.gameId 并取 max+1。
+  const isNewGame = !ctx.gameId;
   let versionNumber = 1;
-  if (gameId) {
+  if (!isNewGame) {
     const last = await prisma.version.findFirst({
-      where: { gameId },
+      where: { gameId: ctx.gameId! },
       orderBy: { versionNumber: "desc" },
       select: { versionNumber: true },
     });
     versionNumber = (last?.versionNumber ?? 0) + 1;
-  } else {
-    const game = await prisma.game.create({
-      data: {
-        title: spec.title,
-        summary: spec.summary,
-        tags: deriveTags(spec),
-        authorId: ctx.userId,
-        status: "DRAFT",
-      },
-      select: { id: true },
-    });
-    gameId = game.id;
   }
+  const gameId = ctx.gameId ?? randomUUID();
 
   const prefix = `games/${gameId}/${versionNumber}`;
 
-  // 2) 算每文件 sha256 + 全量上传 MinIO（先产物后 Version 行）。
+  // 2) 算每文件 sha256 + 全量上传 MinIO（**先产物**；DB 行在第 4 步原子写）。
   const manifestFiles = coder.files.map((f) => ({
     path: f.path,
     contentType: f.contentType,
@@ -105,20 +98,37 @@ export async function runPackager(
   const entryUrl = publicUrl(`${prefix}/index.html`);
   const coverUrl = publicUrl(`${prefix}/cover.svg`);
 
-  // 4) 写 Version(PREVIEW, createdByTaskId) + 回填 Game.coverUrl。
-  const version = await prisma.version.create({
-    data: {
-      gameId,
-      versionNumber,
-      runtime: wireToDb(RUNTIME_WIRE), // MED-5：wire → DB 符号
-      manifestKey,
-      manifestUrl,
-      status: "PREVIEW",
-      createdByTaskId: ctx.taskId,
-    },
-    select: { id: true },
+  // 4) DB 写**最后、原子**（MED-4 无孤儿）：新游戏在一个事务里建 Game(DRAFT)+Version(PREVIEW)；
+  //    regen 则更新 coverUrl + 建 Version。manifest.gameId == prefix == Game.id 保持一致。
+  const version = await prisma.$transaction(async (tx) => {
+    if (isNewGame) {
+      await tx.game.create({
+        data: {
+          id: gameId, // 预生成 id：与上传前缀/manifest.gameId 一致
+          title: spec.title,
+          summary: spec.summary,
+          tags: deriveTags(spec),
+          authorId: ctx.userId,
+          status: "DRAFT",
+          coverUrl,
+        },
+      });
+    } else {
+      await tx.game.update({ where: { id: gameId }, data: { coverUrl } });
+    }
+    return tx.version.create({
+      data: {
+        gameId,
+        versionNumber,
+        runtime: wireToDb(RUNTIME_WIRE), // MED-5：wire → DB 符号
+        manifestKey,
+        manifestUrl,
+        status: "PREVIEW",
+        createdByTaskId: ctx.taskId,
+      },
+      select: { id: true },
+    });
   });
-  await prisma.game.update({ where: { id: gameId }, data: { coverUrl } });
 
   const output = PackageResultSchema.parse({
     gameId,
