@@ -51,6 +51,7 @@
   --primary-foreground: #ffffff;
   --muted: var(--surface-2);
   --muted-foreground: var(--text-muted);
+  --input: var(--border);
   --ring: #27e0ff;
   --destructive: var(--danger);
   --radius: 12px;

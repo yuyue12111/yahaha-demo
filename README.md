@@ -2,8 +2,8 @@
 
 玩家从发现到游玩、创作者从创意到发布的全闭环：**登录 → Create（异步多 Agent 生成）→ 发布 → Home → Play（远端产物隔离运行）**。
 
-> 状态：**脚手架 / 契约阶段**。下方启动命令在实现完成后填实（占位见 TODO）。
-> 设计与契约见 [`docs/`](docs/)；AI 协同规则见 [`CLAUDE.md`](CLAUDE.md)。
+> 状态：**CP1 完成并通过验收** — 远端产物 + 跨域 sandbox Play loader + S3 存储边界。
+> 后续 checkpoint：登录/注册（D1-PM）、异步多 Agent Create（D2）。契约见 [`docs/`](docs/)；规则见 [`CLAUDE.md`](CLAUDE.md)。
 
 ## 技术栈
 
@@ -12,16 +12,19 @@
 模型：可插拔 `ModelClient`（默认 Yahaha GPT-5.5 / 缺省 mock）· 部署：Docker Compose。
 详见 [`docs/01-architecture.md`](docs/01-architecture.md)。
 
-## 快速开始（TODO：实现后填实）
+## 快速开始
 
 ```bash
-cp .env.example .env          # 无需真实模型 key，缺省 mock 模式可完整跑通
-# docker compose up --build   # 起 web/worker/postgres/redis/minio，并自动建桶/CORS/迁移/seed
-# 访问 http://localhost:3000        应用
-# 访问 http://localhost:9001        MinIO 控制台 (minioadmin/minioadmin)
+docker compose up --build     # 起 web + postgres + redis + minio + 一次性 minio-init（自动建桶/公共读/上传 seed bundle）
 ```
 
+- 应用（CP1 Demo）：<http://localhost:3000/play/neon-dodger>
+- MinIO 控制台：<http://localhost:9001>（minioadmin / minioadmin）
+- 无需真实模型 key，也无需先 `cp .env.example .env`（compose 已注入所需 env）；缺省 mock 模式可离线跑通。
+
 ## 核心链路验证（<5 分钟演示脚本，见 plan 第四节 / docs/00-overview.md）
+
+> 注：以下为**完整闭环**验收脚本。**CP1 当前可验证第 2 项（Play 远端加载 / 隔离）**；第 1/3/4 项随后续 checkpoint 落地。
 
 1. Home 列表来自 DB（非写死数组），≥3 个游戏，≥1 来自 Create 流程。
 2. 进 Play：DevTools Network 看产物从 `localhost:9000`（MinIO，异端口）加载；页面 "Source:&lt;URL&gt;" 徽章；iframe `sandbox="allow-scripts"` 无 `allow-same-origin`。
