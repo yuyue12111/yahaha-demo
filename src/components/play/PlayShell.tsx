@@ -60,13 +60,15 @@ export function PlayShell({
 
     watchdogRef.current = setTimeout(() => {
       if (loadedRef.current) return;
-      if (onloadRef.current) {
-        // Frame navigated but never spoke the protocol → degraded "loaded", still interactive.
-        setStatus("loaded");
-      } else {
-        setStatus("failed");
-        setFail({ url: entryUrl, reason: `加载超时：${WATCHDOG_MS / 1000}s 内未收到 GAME_LOADED` });
-      }
+      // MED-1: a 404/NoSuchKey frame ALSO fires onload, so onload is NOT proof of a working game.
+      // Without a real GAME_LOADED handshake within the window → failed (never degrade to "loaded").
+      setStatus("failed");
+      setFail({
+        url: entryUrl,
+        reason: onloadRef.current
+          ? "入口已加载但未收到 GAME_LOADED 握手（可能不是有效游戏或运行期出错）"
+          : `加载超时：${WATCHDOG_MS / 1000}s 内未就绪`,
+      });
     }, WATCHDOG_MS);
 
     const onMessage = (event: MessageEvent) => {
@@ -192,6 +194,8 @@ function resolveErrorMessage(e: ResolveErrorInfo | null): string {
   if (e.error === "GAME_NOT_FOUND") return "未找到该游戏（GAME_NOT_FOUND）";
   if (e.error === "MANIFEST_UNAVAILABLE")
     return "远端清单不可用（MANIFEST_UNAVAILABLE）——MinIO 未就绪或对象缺失";
+  if (e.error === "ENTRY_NOT_FOUND")
+    return "入口产物缺失（ENTRY_NOT_FOUND）——manifest 在但 index.html 不在远端";
   return e.error;
 }
 
