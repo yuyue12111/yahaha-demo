@@ -1,4 +1,5 @@
-import type { AgentContext, CoderOutput, GameSpec, NodeResult } from "./types";
+import { Rng } from "../rng";
+import type { AgentContext, CoderOutput, EngineTuning, GameSpec, NodeResult } from "./types";
 import { CoderOutput as CoderOutputSchema } from "./types";
 
 /** 产物自带 CSP（docs/05/07）：connect-src 'none' 阻断外联；写进 index.html 的 meta 才真正生效。 */
@@ -183,8 +184,34 @@ const ENGINE = String.raw`(function () {
 })();
 `;
 
+/**
+ * L7：GameSpec.engine 可选（真实模型可能省略）。缺省时据 spec 确定性派生默认 engine
+ * （仅由输入决定 → 保红线③：无 Date.now/random），避免对 `spec.engine` 的非空断言崩 CODER。
+ */
+function resolveEngine(spec: GameSpec): EngineTuning {
+  if (spec.engine) return spec.engine;
+  const rng = new Rng(`engine:${spec.title}|${spec.genre}|${spec.theme}`);
+  const byGenre: Record<string, EngineTuning["mode"]> = {
+    collector: "catch",
+    catcher: "catch",
+    runner: "dodge",
+    dodge: "dodge",
+    reaction: "reaction",
+  };
+  const mode = byGenre[spec.genre.toLowerCase()] ?? rng.pick(["dodge", "catch", "reaction"] as const);
+  return {
+    mode,
+    bg: "#0c0a14",
+    grid: "rgba(124,92,255,0.10)",
+    speed: rng.int(120, 210),
+    accel: Number(rng.range(0.03, 0.08).toFixed(3)),
+    spawnMs: rng.int(520, 900),
+    misses: mode === "catch" ? rng.int(3, 5) : 1,
+  };
+}
+
 function gameJs(spec: GameSpec): string {
-  const e = spec.engine!;
+  const e = resolveEngine(spec);
   const inlined = {
     mode: e.mode,
     c0: spec.palette[0],

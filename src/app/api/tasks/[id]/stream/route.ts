@@ -1,6 +1,9 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { publicUrl } from "@/lib/storage";
 import { errorEnvelope } from "@/lib/contracts/error";
+import { dbToWire } from "@/lib/contracts/runtime";
+import type { TaskDoneData } from "@/lib/contracts/tasks";
 import { subscribeTaskEvents } from "@/lib/events";
 import { toLogDTO } from "@/lib/task-serialize";
 
@@ -27,7 +30,31 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (task.userId !== session.user.id) return json(errorEnvelope("FORBIDDEN", "非本人任务"), 403);
 
   const encoder = new TextEncoder();
-  const terminal = task.status === "SUCCEEDED" || task.status === "FAILED";
+
+  // MED-3：终态 done 也带预览字段（gameId/versionNumber/runtime/entryUrl/manifestUrl），从 resultVersion 回填，
+  // 与实时 done 同形 → 重连/刷新后的客户端也能直接预览 PREVIEW 产物。
+  let terminalDone: TaskDoneData | null = null;
+  if (task.status === "FAILED") {
+    terminalDone = { status: "FAILED", error: task.error ?? undefined };
+  } else if (task.status === "SUCCEEDED") {
+    const v = task.resultVersionId
+      ? await prisma.version.findUnique({
+          where: { id: task.resultVersionId },
+          select: { gameId: true, versionNumber: true, runtime: true, manifestKey: true },
+        })
+      : null;
+    terminalDone = v
+      ? {
+          status: "SUCCEEDED",
+          versionId: task.resultVersionId ?? undefined,
+          gameId: v.gameId,
+          versionNumber: v.versionNumber,
+          runtime: dbToWire(v.runtime),
+          manifestUrl: publicUrl(v.manifestKey),
+          entryUrl: publicUrl(`${v.manifestKey.replace(/\/[^/]*$/, "")}/index.html`),
+        }
+      : { status: "SUCCEEDED", versionId: task.resultVersionId ?? undefined };
+  }
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -45,13 +72,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       write("status", { status: task.status, currentStep: task.currentStep });
       for (const l of task.logs) write("log", toLogDTO(l));
 
-      // 2) 已终态 → 直接补 done 并关闭（无需订阅）。
-      if (terminal) {
-        write("done", {
-          status: task.status,
-          versionId: task.resultVersionId ?? undefined,
-          error: task.error ?? undefined,
-        });
+      // 2) 已终态 → 直接补 done（带预览字段）并关闭（无需订阅）。
+      if (terminalDone) {
+        write("done", terminalDone);
         open = false;
         try {
           controller.close();
