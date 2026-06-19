@@ -24,6 +24,7 @@ npm-debug.log*
 coverage/
 .vscode/
 .idea/
+.obsidian/
 
 # minio local data (if mounted)
 .minio-data/
