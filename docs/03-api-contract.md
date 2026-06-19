@@ -63,7 +63,7 @@ worker 经 Redis pub/sub 发布，本端点中继。事件名 + JSON data：
 | `status` | `{ status: TaskStatus, currentStep?: AgentName }` | 任务状态流转 |
 | `step` | `{ agentName, seq, title, state:"start"\|"end", level }` | 节点开始/结束 |
 | `log` | `{ seq, agentName, title, inputSummary?, outputSummary? }` | 可读步骤日志 |
-| `done` | `{ status:"SUCCEEDED"\|"FAILED", versionId?, manifestUrl?, error? }` | 终态，前端关闭流 |
+| `done` | `{ status:"SUCCEEDED"\|"FAILED", versionId?, gameId?, versionNumber?, runtime?, manifestUrl?, entryUrl?, error? }` | 终态，前端关闭流。成功时附 `gameId/versionNumber/runtime/entryUrl`，使 Create 预览能直接复用 Play 的跨域 sandbox 加载 PREVIEW 产物（无需先发布） |
 
 > 任一时刻前端都能用 `GET /api/tasks/:id` 重建当前状态（SSE 仅为体验增强，可降级为轮询）。
 

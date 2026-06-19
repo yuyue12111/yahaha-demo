@@ -3,6 +3,8 @@
 #   unrs-resolver   — eslint import resolver used by eslint-config-next
 #   esbuild         — tsx 的运行时（seed 脚本用）
 #   prisma/@prisma  — 生成 client + 下载 query/migration 引擎
+# 显式置 false（已知、不构建）：
+#   msgpackr-extract — bullmq→msgpackr 的可选原生加速器；纯 JS 有 fallback，无需在 alpine 上 node-gyp 构建。
 # 扁平 node_modules：让 node_modules/.prisma + @prisma/client 成为稳定顶层路径，
 # 供 Dockerfile 显式 COPY Prisma 引擎进 standalone runner（pnpm 11 此设置在此处，非 .npmrc）。
 nodeLinker: hoisted
@@ -11,6 +13,7 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   esbuild: true
+  msgpackr-extract: false
   prisma: true
   sharp: true
   unrs-resolver: true

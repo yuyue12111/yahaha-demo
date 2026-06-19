@@ -83,6 +83,43 @@ services:
       S3_BUCKET: yahaha
     command: ["sh", "-c", "pnpm prisma migrate deploy && pnpm tsx prisma/seed.ts"]
 
+  # 独立 worker 进程：消费 BullMQ 队列跑 6 节点 Agent 流水线（红线④）。
+  # 与 seed 同范式（target: builder，含 prisma client + tsx）；与 web 不同进程。
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully # 产物桶就位
+      seed:
+        condition: service_completed_successfully # DB schema 就位（migrate 在 seed 里跑）
+    environment:
+      NODE_ENV: production
+      # dual endpoint：putObject 走内网 minio:9000；manifest/entryUrl/coverUrl 烧录 localhost:9000（浏览器可达）
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET: yahaha
+      S3_FORCE_PATH_STYLE: "true"
+      DATABASE_URL: postgresql://yahaha:yahaha@db:5432/yahaha?schema=public
+      REDIS_URL: redis://redis:6379
+      # 模型 seam：缺省 mock，无 key 也能离线复现整条流水线（Fatal #3/#5）。填 MODEL_* 即切真实模型。
+      MODEL_PROVIDER: ${MODEL_PROVIDER:-mock}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      MODEL_NAME: ${MODEL_NAME:-gpt-5.5}
+      VISION_MODEL_NAME: ${VISION_MODEL_NAME:-}
+    command: ["pnpm", "tsx", "src/worker/index.ts"]
+
   web:
     build:
       context: .
@@ -90,6 +127,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy # web 入队 BullMQ 需 redis 就位
       minio-init:
         condition: service_completed_successfully # bucket + Play 产物就位
       seed:
