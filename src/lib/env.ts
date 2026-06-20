@@ -38,6 +38,14 @@ const EnvSchema = z.object({
   MODEL_NAME: z.string().min(1).default("gpt-5.5"),
   VISION_MODEL_NAME: z.string().optional().default(""),
 
+  // ---- OAuth 第三方登录（加分项，docs/03 §OAuth）----
+  // env-gated：配齐 id+secret 才注册对应 provider（仿模型 seam）。缺省即不启用 → 邮箱登录照常，
+  // 红线⑤「无密钥也能跑」成立；.env.example 仅占位、绝不提交真凭据。
+  GOOGLE_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
+  GITHUB_CLIENT_ID: z.string().optional().default(""),
+  GITHUB_CLIENT_SECRET: z.string().optional().default(""),
+
   // ---- 资源限额 / 安全阈值 (docs/07 §5) ----
   MAX_UPLOAD_BYTES: intDefault(10_485_760), // 10MB
   GENERATION_TIMEOUT_MS: intDefault(180_000),
@@ -66,6 +74,11 @@ export const env = EnvSchema.parse({
   MODEL_API_KEY: process.env.MODEL_API_KEY,
   MODEL_NAME: process.env.MODEL_NAME,
   VISION_MODEL_NAME: process.env.VISION_MODEL_NAME,
+
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
 
   MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
   GENERATION_TIMEOUT_MS: process.env.GENERATION_TIMEOUT_MS,

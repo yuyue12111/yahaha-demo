@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/Logo";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
+import { oauthEnabled } from "@/lib/auth";
+
+// 运行时渲染：OAuth 按钮按运行时 env 凭据决定（env-gated），不可静态预渲染（否则按 build 时凭据冻结）。
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
@@ -16,7 +20,7 @@ export default function LoginPage() {
         <p className="mb-5 mt-1 text-[13px] text-ink-muted">欢迎回来。</p>
         {/* useSearchParams 需 Suspense 边界（Next 15） */}
         <Suspense>
-          <AuthForm mode="login" />
+          <AuthForm mode="login" oauth={oauthEnabled} />
         </Suspense>
         <p className="mt-4 text-[13px] text-ink-muted">
           还没有账号？

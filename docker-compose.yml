@@ -161,6 +161,11 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-not-for-production-change-me-0000}
       AUTH_URL: http://localhost:3000
       AUTH_TRUST_HOST: "true"
+      # OAuth（加分项，env-gated）：从 .env/host 透传；留空 → provider 不注册、仅邮箱登录（红线⑤无密钥也跑）。
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s

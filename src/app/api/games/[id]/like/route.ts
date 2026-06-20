@@ -8,8 +8,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/games/:id/favorite —— 切换收藏（书签）。登录必需；游戏须已发布。
- * 已收藏→删，未收藏→建（@@unique[userId,gameId] 保幂等）。返回 { favorited }。
+ * POST /api/games/:id/like —— 切换点赞。登录必需；游戏须已发布。
+ * 已赞→删，未赞→建（@@unique[userId,gameId] 保幂等）。返回 { liked, likes }（含最新计数，按钮直显）。
+ * 幂等并发安全：与 favorite 同范式（取消 deleteMany 不抛、新增 create 捕 P2002 当已赞），避免 check-then-act 撞 @@unique 抛 500。
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireUser();
@@ -22,24 +23,22 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json(errorEnvelope("NOT_FOUND", "游戏不存在或未发布"), { status: 404 });
   }
 
-  // 幂等并发安全：取消用 deleteMany（无则 0 行，不抛）；新增 create 捕获 P2002（并发已建）当作已收藏。
-  // 避免 check-then-act 在双击/多标签并发下撞 @@unique 抛未包装 500。
-  const existing = await prisma.favorite.findUnique({
+  const existing = await prisma.like.findUnique({
     where: { userId_gameId: { userId, gameId } },
     select: { id: true },
   });
 
   if (existing) {
-    await prisma.favorite.deleteMany({ where: { userId, gameId } });
-    const favorites = await prisma.favorite.count({ where: { gameId } });
-    return NextResponse.json({ favorited: false, favorites });
+    await prisma.like.deleteMany({ where: { userId, gameId } });
+    const likes = await prisma.like.count({ where: { gameId } });
+    return NextResponse.json({ liked: false, likes });
   }
   try {
-    await prisma.favorite.create({ data: { userId, gameId } });
+    await prisma.like.create({ data: { userId, gameId } });
   } catch (e) {
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
-    // 并发已建 → 幂等当作已收藏，继续返回最新计数。
+    // 并发已建 → 幂等当作已赞，继续返回最新计数。
   }
-  const favorites = await prisma.favorite.count({ where: { gameId } });
-  return NextResponse.json({ favorited: true, favorites });
+  const likes = await prisma.like.count({ where: { gameId } });
+  return NextResponse.json({ liked: true, likes });
 }
