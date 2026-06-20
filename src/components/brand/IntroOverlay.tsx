@@ -10,7 +10,8 @@ import { PixelWordmark } from "./Logo";
  *
  * dock 目标 = 侧栏品牌 lockup（`[data-dock-target]`，带重试测量）。测不到（移动端侧栏隐藏）退化为居中淡出。
  * 飞行用 rAF 直接驱动 transform（不依赖 CSS transition，规避 toggle 不触发的坑）。
- * 每会话一次（sessionStorage）、`prefers-reduced-motion` 跳过、SKIP。纯 canvas 2D，离线安全，红线零影响。
+ * 只在裸首页(/ 且无 query) 播、看过一次永不再播（localStorage，跨标签页持久）、`prefers-reduced-motion` 跳过、SKIP。
+ * 纯 canvas 2D，离线安全，红线零影响。
  */
 
 const SEEN_KEY = "yahaha-intro-seen";
@@ -62,18 +63,20 @@ export function IntroOverlay() {
   useEffect(() => {
     const reduce =
       typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // 只在“裸首页”(/ 且无 query) 才播：搜索结果(/?search=)/深链一律跳过（与内联脚本逐字一致）。
+    const bare = window.location.pathname === "/" && !window.location.search;
     let seen = false;
     try {
-      seen = !!window.sessionStorage.getItem(SEEN_KEY);
+      seen = !!window.localStorage.getItem(SEEN_KEY);
     } catch {
       seen = false;
     }
-    if (reduce || seen) {
+    if (reduce || seen || !bare) {
       setGone(true);
       return;
     }
     try {
-      window.sessionStorage.setItem(SEEN_KEY, "1");
+      window.localStorage.setItem(SEEN_KEY, "1");
     } catch {
       /* private mode — still play once */
     }
