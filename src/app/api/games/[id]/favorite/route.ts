@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/require-user";
 import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
@@ -21,15 +22,24 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json(errorEnvelope("NOT_FOUND", "游戏不存在或未发布"), { status: 404 });
   }
 
+  // 幂等并发安全：取消用 deleteMany（无则 0 行，不抛）；新增 create 捕获 P2002（并发已建）当作已收藏。
+  // 避免 check-then-act 在双击/多标签并发下撞 @@unique 抛未包装 500。
   const existing = await prisma.favorite.findUnique({
     where: { userId_gameId: { userId, gameId } },
     select: { id: true },
   });
 
   if (existing) {
-    await prisma.favorite.delete({ where: { id: existing.id } });
+    await prisma.favorite.deleteMany({ where: { userId, gameId } });
     return NextResponse.json({ favorited: false });
   }
-  await prisma.favorite.create({ data: { userId, gameId } });
-  return NextResponse.json({ favorited: true });
+  try {
+    await prisma.favorite.create({ data: { userId, gameId } });
+    return NextResponse.json({ favorited: true });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ favorited: true }); // 并发已建 → 幂等返回已收藏
+    }
+    throw e;
+  }
 }

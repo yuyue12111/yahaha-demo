@@ -64,15 +64,29 @@ export function CreateStudio({
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const esRef = useRef<EventSource | null>(null);
-  useEffect(() => () => esRef.current?.close(), []);
+  // SSE 断流重连：服务端每次连接重发 status+log 快照，终态补发 done → 重连即可追平（含预览/发布字段）。
+  const reconnectsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const MAX_RECONNECTS = 6;
+  useEffect(
+    () => () => {
+      esRef.current?.close();
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    },
+    [],
+  );
 
   const busy = taskStatus === "PENDING" || taskStatus === "RUNNING";
 
   // ---- SSE：worker 经 Redis pub/sub 发的事件中继到这里（docs/03 §SSE）----
   const openStream = useCallback((id: string) => {
     esRef.current?.close();
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     const es = new EventSource(`/api/tasks/${id}/stream`);
     esRef.current = es;
+    es.onopen = () => {
+      reconnectsRef.current = 0; // 连接（重新）建立 → 重置重连计数
+    };
     es.addEventListener("status", (ev) => {
       setTaskStatus(JSON.parse((ev as MessageEvent).data).status);
     });
@@ -93,16 +107,24 @@ export function CreateStudio({
       es.close();
     });
     es.onerror = () => {
-      // 连接中断 → 轮询一次重建状态（SSE 仅增强，docs/03）。
+      // 连接中断 → 先轮询一次刷新状态，再退避重连 SSE。
+      // 正常终态是 done 事件里 es.close()（干净关闭，不触发 onerror）；故 onerror 一定是"未干净收尾"，
+      // 重连后服务端会重放 status+log，终态再补发 done（含预览/发布字段）→ 自动追平，不会死循环。
       es.close();
       void fetch(`/api/tasks/${id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data) return;
-          setTaskStatus(data.task.status);
+          setTaskStatus(data.task.status as TaskStatus);
           setLogsByAgent(
             Object.fromEntries((data.logs as AgentLogDTO[]).map((l) => [l.agentName, l])),
           );
+          if (reconnectsRef.current < MAX_RECONNECTS) {
+            reconnectsRef.current += 1;
+            reconnectTimerRef.current = setTimeout(() => openStream(id), 2000);
+          } else {
+            setSubmitError("实时连接中断，请刷新页面查看最新进度。");
+          }
         });
     };
   }, []);
@@ -116,6 +138,8 @@ export function CreateStudio({
     setTaskStatus("PENDING");
     setPublished(false);
     setPublishError(null);
+    reconnectsRef.current = 0;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
   };
 
   // ---- 发布：闭合 create→publish→Home（docs/03:33）----
