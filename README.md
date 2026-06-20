@@ -87,8 +87,9 @@ docker compose up --build
 - retry 当前为从 INGEST 幂等整跑；durable-step 续跑 deferred。
 - VALIDATOR→fallback 替换路径 deferred（CODER 为确定性模板，结构上已是确定性产物）。
 - VALIDATOR 的 AST 解析（acorn/esbuild）deferred，当前为结构/契约存在性 + 体积静态校验。
-- `remixOfVersionId` accepted-but-ignored（Remix deferred 至加分轮）。
-- 点赞 / 收藏：`Like`/`Favorite` 数据模型 + 统计读出已在（详情页 `stats` 真计数），但写入端点 + UI deferred（故详情页 `liked/favorited` 暂不返回）。
+- **Remix（已实现，2026-06-21）**：详情页「✦ Remix」→ `/create?remix=<id>` 用该游戏标题/简介**预填创意**，二创成一个新独立游戏。深层血缘 `remixOfVersionId`（产 versionNumber+1 的同源版本，docs/05）仍 accepted-but-ignored。
+- **点赞 / 收藏（已实现，2026-06）**：`POST /api/games/:id/{like,favorite}` 幂等切换 + 真计数；详情页 ♥/★ 交互按钮、卡片书签。
+- **生成任务历史（已实现，2026-06-21）**：`/me?tab=tasks` 列出本人生成任务（状态/创意/模型/时间），失败可一键重试，成功可查看产物。
 - 内容审核 deferred；`PlayEvent.START` 未发（仅 LOAD/END/ERROR）。
 - 平台 admin deferred：维护到 **owner-scoped**（作者管理自己的游戏）；跨用户管理 / 全平台可观测聚合面 + `User.role` 权限门未建（当前靠 owner-scoped + MinIO 控制台 :9001 / SQL）。
 

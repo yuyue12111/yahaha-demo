@@ -44,11 +44,14 @@ const STATE_LABEL: Record<NodeState, string> = {
 
 export function CreateStudio({
   regen = null,
+  seedPrompt,
 }: {
   /** 非空 → 在已有游戏上生成新版本（提交带 gameId → packager 产 versionNumber+1）。 */
   regen?: { gameId: string; title: string } | null;
+  /** Remix 预填：基于某已发布游戏二创时，预先填入创意输入框（用户可改）。 */
+  seedPrompt?: string;
 } = {}) {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(seedPrompt ?? "");
   const [submittedPrompt, setSubmittedPrompt] = useState(""); // 已提交的创意 → 聊天用户气泡
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadBusy, setUploadBusy] = useState(false);

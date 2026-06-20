@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { listGamesByAuthor, listFavoriteGames, getFavoriteIds } from "@/lib/games";
+import { listRecentTasks, type TaskHistoryItem } from "@/lib/task-history";
 import { GameCard } from "@/components/game/GameCard";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
 import { Button } from "@/components/ui/Button";
 import { RemoteImg } from "@/components/ui/RemoteImg";
 import { YForkLogo } from "@/components/brand/Logo";
+import { TaskRetryButton } from "@/components/create/TaskRetryButton";
 
 // 默认背景板渐变（也作上传背景失效时的兜底）。
 const BANNER_BG =
@@ -33,13 +35,15 @@ export default async function MePage({
   const userId = session.user.id;
 
   const sp = await searchParams;
-  const tab = sp.tab === "created" ? "created" : "favorites";
+  const tab =
+    sp.tab === "created" ? "created" : sp.tab === "tasks" ? "tasks" : "favorites";
 
-  const [user, { published, draftCount, totalPlays }, favorites, favoriteIds] = await Promise.all([
+  const [user, { published, draftCount, totalPlays }, favorites, favoriteIds, tasks] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatarUrl: true, bannerUrl: true } }),
     listGamesByAuthor(userId),
     listFavoriteGames(userId),
     getFavoriteIds(userId),
+    tab === "tasks" ? listRecentTasks(userId) : Promise.resolve([] as TaskHistoryItem[]),
   ]);
 
   const name = user?.displayName ?? session.user.name ?? session.user.email ?? "我";
@@ -142,10 +146,19 @@ export default async function MePage({
         <TabLink href="/me?tab=created" active={tab === "created"}>
           作品
         </TabLink>
+        <TabLink href="/me?tab=tasks" active={tab === "tasks"}>
+          生成记录
+        </TabLink>
       </div>
 
       {/* content */}
-      {tab === "favorites" ? (
+      {tab === "tasks" ? (
+        tasks.length === 0 ? (
+          <EmptyState title="还没有生成记录" desc="在 Create 里输入一个创意，生成的每个任务都会记录在这里。" />
+        ) : (
+          <TaskHistoryList tasks={tasks} />
+        )
+      ) : tab === "favorites" ? (
         favorites.length === 0 ? (
           <EmptyState title="还没有收藏的游戏" desc="喜欢的游戏点卡片上的书签收藏，就会出现在这里。" />
         ) : (
@@ -157,6 +170,65 @@ export default async function MePage({
         <Grid games={published} favSet={favSet} />
       )}
     </div>
+  );
+}
+
+// 生成任务历史（加分项）：状态徽章 + 创意 + 模型/时间 + 失败重试 / 查看产物。
+const TASK_STATUS: Record<string, { label: string; color: string }> = {
+  PENDING: { label: "排队中", color: "var(--canceled)" },
+  RUNNING: { label: "生成中", color: "var(--running)" },
+  SUCCEEDED: { label: "已完成", color: "var(--ok)" },
+  FAILED: { label: "失败", color: "var(--danger)" },
+  CANCELED: { label: "已取消", color: "var(--canceled)" },
+};
+
+function TaskHistoryList({ tasks }: { tasks: TaskHistoryItem[] }) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {tasks.map((t) => {
+        const s = TASK_STATUS[t.status] ?? { label: t.status, color: "var(--text-muted)" };
+        return (
+          <li
+            key={t.id}
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-hairline bg-surface px-4 py-3"
+          >
+            <span
+              className="shrink-0 rounded-pill px-2.5 py-0.5 font-mono text-[11px] font-medium"
+              style={{ color: s.color, border: `1px solid ${s.color}`, opacity: 0.95 }}
+            >
+              {s.label}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[14px] text-ink" title={t.prompt}>
+              {t.prompt || "（无创意文本）"}
+            </span>
+            <span className="shrink-0 font-mono text-[11px] text-ink-faint">
+              {t.modelProvider ? `${t.modelProvider} · ` : ""}
+              {t.createdAt.slice(0, 16).replace("T", " ")}
+              {t.attempt > 0 ? ` · 重试${t.attempt}` : ""}
+            </span>
+            <span className="shrink-0">
+              {t.status === "SUCCEEDED" && t.gameId ? (
+                <Link
+                  href={t.gamePublished ? `/games/${t.gameId}` : `/play/${t.gameId}`}
+                  className="rounded-pill border border-hairline-strong px-3 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+                >
+                  查看产物
+                </Link>
+              ) : t.status === "FAILED" ? (
+                <TaskRetryButton taskId={t.id} />
+              ) : t.status === "RUNNING" || t.status === "PENDING" ? (
+                <Link
+                  href="/create"
+                  className="rounded-pill border border-hairline-strong px-3 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+                >
+                  去看进度
+                </Link>
+              ) : null}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

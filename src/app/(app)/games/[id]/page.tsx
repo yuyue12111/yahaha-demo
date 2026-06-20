@@ -133,6 +133,15 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
               tone="control"
               count={game._count.favorites}
             />
+            {/* Remix 派生（加分项）：基于本游戏二次创作，去 Create 预填创意。 */}
+            {game.status === "PUBLISHED" ? (
+              <Link
+                href={`/create?remix=${game.id}`}
+                className="inline-flex items-center gap-1.5 rounded-pill border border-hairline-strong px-3 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+              >
+                ✦ Remix
+              </Link>
+            ) : null}
             {active.ok ? (
               <span className="ml-auto font-mono text-[11px] text-ink-faint">
                 runtime {active.data.runtime} · v{active.data.versionNumber}
