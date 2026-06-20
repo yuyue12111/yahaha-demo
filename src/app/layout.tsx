@@ -25,15 +25,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN" className={jakarta.variable}>
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
-        {/* 首帧前：已看过 intro 的会话给 <html> 加 .intro-seen → CSS 隐藏覆盖层，避免后续导航（含搜索）闪黑场 */}
+        {/* 首帧前给 <html> 加 .intro-seen → CSS 隐藏覆盖层（避免闪黑场）。
+            intro 只在“裸首页”(/ 且无 query) 才有资格播；任何搜索结果(/?search=)/深链/已看过的浏览器一律跳过。
+            存 localStorage（跨标签页持久），与 IntroOverlay 的门控逐字一致。 */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(sessionStorage.getItem('yahaha-intro-seen'))document.documentElement.classList.add('intro-seen')}catch(e){}",
+              "try{var bare=location.pathname==='/'&&!location.search;if(localStorage.getItem('yahaha-intro-seen')||!bare)document.documentElement.classList.add('intro-seen')}catch(e){}",
           }}
         />
         {children}
-        {/* 入场动画（每会话一次，盖在真 app 上播完淡出；reduced-motion 跳过） */}
+        {/* 入场动画（仅裸首页、看过永不再播，盖在真 app 上播完淡出；reduced-motion 跳过） */}
         <IntroOverlay />
         {/* 街机指针（细指针设备接管系统光标；触屏/reduced-motion 自适配；对红线② 零影响） */}
         <ArcadeCursor />
