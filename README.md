@@ -26,7 +26,7 @@ docker compose up --build
 - MinIO 控制台：<http://localhost:9001>（`minioadmin` / `minioadmin`）
 - **无需真实模型 key，无需先 `cp .env.example .env`**：compose 已注入所需 env，缺省 `mock` 模式离线跑通整条链路。
 - 预置账号（可直接登录体验发布）：`studio@yahaha.dev` / `yahaha-demo`。
-- 接真实模型：填 `.env` 的 `MODEL_PROVIDER` + `MODEL_BASE_URL` + `MODEL_API_KEY`（OpenAI 兼容），`docker compose up -d worker` 重启 worker 即生效（seed 恒用 mock 以保可复现）。
+- 接真实模型（G1）：`.env` 设 `MODEL_PROVIDER=openai`（或 `codex`，二者都走 `OpenAICompatibleClient`）+ `MODEL_BASE_URL`（须支持 OpenAI **Chat Completions** `/chat/completions`）+ `MODEL_API_KEY` + `MODEL_NAME`，`docker compose up -d worker` 重启 worker 即生效。**seed 服务恒用 `mock`、`.env.example` 与 compose 缺省也恒 `mock`** → 无 key 冷启动仍可离线复现（红线⑤不破）；切真模型只影响 worker 运行期生成质量。
 
 ## 核心链路验证（<5 分钟演示脚本）
 

@@ -230,22 +230,61 @@ function gameJs(spec: GameSpec): string {
   );
 }
 
-/** 调色板驱动的 3:4 封面（降级阶梯 SVG 缩略图，无需 Chromium）。 */
+/** 玩法图标（V1）：据 mode 画可辨识的矢量骨架，居中于 (0,0)，调色板着色（确定性）。 */
+function coverGlyph(mode: string, a: string, b: string, c: string): string {
+  if (mode === "reaction") {
+    return (
+      `<circle r="58" fill="none" stroke="${a}" stroke-width="2" opacity="0.35"/>` +
+      `<circle r="40" fill="none" stroke="${b}" stroke-width="2" opacity="0.55"/>` +
+      `<circle r="22" fill="none" stroke="${c}" stroke-width="2" opacity="0.85"/>` +
+      `<circle r="9" fill="${a}"/>`
+    );
+  }
+  if (mode === "catch") {
+    return (
+      `<circle cx="-22" cy="-44" r="9" fill="${b}"/>` +
+      `<circle cx="16" cy="-22" r="7" fill="${c}"/>` +
+      `<circle cx="-3" cy="0" r="8" fill="${a}"/>` +
+      `<path d="M-44 38 L44 38 L33 66 L-33 66 Z" fill="none" stroke="${a}" stroke-width="4" stroke-linejoin="round"/>`
+    );
+  }
+  // dodge（默认）：坠落障碍 + 底部玩家条
+  return (
+    `<path d="M-34 -46 L-19 -16 L-49 -16 Z" fill="${b}"/>` +
+    `<path d="M18 -30 L32 0 L4 0 Z" fill="${c}"/>` +
+    `<path d="M-6 6 L9 36 L-21 36 Z" fill="${a}" opacity="0.85"/>` +
+    `<rect x="-27" y="54" width="54" height="14" rx="7" fill="url(#g)"/>`
+  );
+}
+
+/** 调色板 + 玩法驱动的 3:4 封面（降级阶梯 SVG 缩略图，无需 Chromium；确定性，红线③）。 */
 function coverSvg(spec: GameSpec): string {
-  const [a, b, c] = [spec.palette[0], spec.palette[1] ?? spec.palette[0], spec.palette[2] ?? spec.palette[0]];
+  const a = spec.palette[0];
+  const b = spec.palette[1] ?? a;
+  const c = spec.palette[2] ?? b;
   const bg = spec.engine?.bg ?? "#0c0a14";
+  const grid = spec.engine?.grid ?? "rgba(124,92,255,0.12)";
+  const mode = spec.engine?.mode ?? "dodge";
+  let lines = "";
+  for (let x = 24; x < 300; x += 28) lines += `<line x1="${x}" y1="0" x2="${x}" y2="400" stroke="${grid}" stroke-width="1"/>`;
+  for (let y = 24; y < 400; y += 28) lines += `<line x1="0" y1="${y}" x2="300" y2="${y}" stroke="${grid}" stroke-width="1"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" width="300" height="400" role="img" aria-label="${esc(spec.title)}">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="${a}"/><stop offset="0.55" stop-color="${b}"/><stop offset="1" stop-color="${c}"/>
     </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.55">
+      <stop offset="0" stop-color="${a}" stop-opacity="0.5"/><stop offset="1" stop-color="${a}" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <rect width="300" height="400" fill="${bg}"/>
-  <circle cx="150" cy="150" r="120" fill="url(#g)" opacity="0.18"/>
-  <circle cx="150" cy="150" r="74" fill="none" stroke="url(#g)" stroke-width="3" opacity="0.9"/>
-  <rect x="120" y="300" width="60" height="14" rx="7" fill="${a}"/>
-  <text x="150" y="356" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#f4f1fa">${esc(spec.title)}</text>
-  <text x="150" y="380" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#9d95b0">${esc(spec.engine?.mode ?? spec.genre)} · neon arcade</text>
+  ${lines}
+  <rect width="300" height="400" fill="url(#glow)"/>
+  <g transform="translate(150 162)">${coverGlyph(mode, a, b, c)}</g>
+  <rect x="0" y="296" width="300" height="104" fill="${bg}" opacity="0.62"/>
+  <rect x="20" y="312" width="44" height="4" rx="2" fill="url(#g)"/>
+  <text x="20" y="348" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24" font-weight="800" fill="#f4f1fa">${esc(spec.title)}</text>
+  <text x="20" y="372" font-family="ui-monospace, monospace" font-size="11" fill="#9d95b0">${esc(mode)} · neon arcade</text>
 </svg>
 `;
 }

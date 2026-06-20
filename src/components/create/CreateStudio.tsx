@@ -341,7 +341,10 @@ export function CreateStudio({
                   className="flex gap-3 rounded-md border border-hairline bg-surface-inset p-2.5"
                 >
                   <span
-                    className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                    key={st}
+                    className={`yh-pop mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${
+                      st === "running" ? "animate-pulse" : ""
+                    }`}
                     style={{
                       color: STATE_COLOR[st],
                       background: `color-mix(in srgb, ${STATE_COLOR[st]} 16%, transparent)`,
@@ -361,6 +364,9 @@ export function CreateStudio({
                       </span>
                     </div>
                     <p className="text-[11px] text-ink-faint">{node.desc}</p>
+                    {st === "running" ? (
+                      <div className="yh-shimmer-track mt-1 h-0.5 w-full rounded bg-surface-2" />
+                    ) : null}
                     {log?.outputSummary ? (
                       <p
                         className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px]"

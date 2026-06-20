@@ -39,6 +39,7 @@ export function PlayShell({
 
   const [status, setStatus] = useState<PlayStatus>(active ? "loading" : "failed");
   const [score, setScore] = useState(0);
+  const [showStart, setShowStart] = useState(false); // P1：加载后「点击开始」提示，点击聚焦 iframe
   const [fail, setFail] = useState<{ url: string | null; reason: string }>(() =>
     active
       ? { url: null, reason: "" }
@@ -59,6 +60,7 @@ export function PlayShell({
     loadAtRef.current = null;
     setStatus("loading");
     setScore(0);
+    setShowStart(false);
     setFail({ url: null, reason: "" });
 
     // 埋点回写（docs/06/08）：同源 POST，fire-and-forget，失败不影响游玩。
@@ -103,9 +105,11 @@ export function PlayShell({
           loadedRef.current = true;
           clearWatchdog();
           setStatus("loaded");
+          iframeRef.current?.focus(); // P1：聚焦 iframe，键盘立即可控（不必先点画面）
           if (!loadReportedRef.current) {
             loadReportedRef.current = true; // 本地重开重复广播 GAME_LOADED → 只第一次计一次 play
             loadAtRef.current = Date.now();
+            setShowStart(true); // 首屏「点击开始」提示
             report("LOAD");
           }
           break;
@@ -152,6 +156,7 @@ export function PlayShell({
     win.postMessage(hostMessage("HOST_RESTART"), "*"); // targetOrigin "*": can't name a null origin
     setScore(0);
     setStatus("loaded");
+    iframeRef.current?.focus(); // P1：重开后保持键盘可控
   }, []);
 
   return (
@@ -212,6 +217,15 @@ export function PlayShell({
         ) : null}
 
         {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
+        {status === "loaded" && showStart ? (
+          <StartOverlay
+            controls={active?.controls ?? ""}
+            onStart={() => {
+              iframeRef.current?.focus();
+              setShowStart(false);
+            }}
+          />
+        ) : null}
         {status === "failed" ? (
           <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
         ) : null}
@@ -263,6 +277,26 @@ function LoadingOverlay({ controls }: { controls: string }) {
         {controls ? <p className="text-[12px] text-ink-faint">玩法：{controls}</p> : null}
       </div>
     </div>
+  );
+}
+
+function StartOverlay({ controls, onStart }: { controls: string; onStart: () => void }) {
+  // 满舞台按钮：点击任意处聚焦 iframe 并开始（修「进游戏按键无反应」）。
+  return (
+    <button
+      type="button"
+      onClick={onStart}
+      aria-label="点击开始游戏"
+      className="absolute inset-0 grid place-items-center bg-surface-inset/55 backdrop-blur-[1px] transition-opacity"
+    >
+      <span className="flex flex-col items-center gap-2 px-6 text-center">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-grad-play text-[18px] text-white shadow-lg">
+          ▶
+        </span>
+        <span className="text-sm font-semibold text-ink">点击开始</span>
+        {controls ? <span className="text-[12px] text-ink-muted">{controls}</span> : null}
+      </span>
+    </button>
   );
 }
 
