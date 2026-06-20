@@ -7,6 +7,7 @@ import type { ActiveVersionResponse } from "@/lib/contracts/games";
 import { GameMessage, hostMessage } from "@/lib/contracts/play-messages";
 import { StatePill } from "./StatePill";
 import { SourceBadge } from "./SourceBadge";
+import { YForkLogo } from "@/components/brand/Logo";
 
 export type PlayStatus = "loading" | "loaded" | "failed" | "ended";
 export type ResolveErrorInfo = { status: number; error: string; detail: string | null };
@@ -30,6 +31,7 @@ export function PlayShell({
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
   const onloadRef = useRef(false);
@@ -159,20 +161,20 @@ export function PlayShell({
     iframeRef.current?.focus(); // P1：重开后保持键盘可控
   }, []);
 
+  // P2：全屏化舞台（宿主对自己的容器调用，非沙箱 iframe 请求 → 不需 allow-fullscreen，不动红线②）。
+  const handleFullscreen = useCallback(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void el.requestFullscreen?.().catch(() => {});
+  }, []);
+
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 px-4 py-6">
       {/* top bar */}
       <header className="flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span
-            className="grid h-7 w-7 place-items-center bg-grad-play text-white"
-            style={{ borderRadius: "30%" }}
-            aria-hidden
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2l2.9 6.26L21.8 9l-5 4.6L18.2 21 12 17.3 5.8 21l1.4-7.4-5-4.6 6.9-.74L12 2z" />
-            </svg>
-          </span>
+          <YForkLogo size={28} />
           <span className="text-[15px] font-extrabold tracking-tight">Yahaha</span>
         </Link>
         <div className="flex items-center gap-3">
@@ -200,7 +202,10 @@ export function PlayShell({
       </header>
 
       {/* stage */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-hairline-brand bg-surface-inset">
+      <div
+        ref={stageRef}
+        className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-hairline-brand bg-surface-inset"
+      >
         {active ? (
           <iframe
             key={reloadKey}
@@ -234,6 +239,36 @@ export function PlayShell({
         ) : null}
       </div>
 
+      {/* control bar — 真实控件（重开 / 全屏）；不放未实现的暂停/音量/收藏/分享/在线 */}
+      {active ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRestart}
+            disabled={status !== "loaded" && status !== "ended"}
+            title="重开"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 12a9 9 0 1 0 2.6-6.4" />
+              <path d="M3 4v4h4" />
+            </svg>
+            重开
+          </button>
+          <button
+            type="button"
+            onClick={handleFullscreen}
+            title="全屏"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+            全屏
+          </button>
+        </div>
+      ) : null}
+
       {/* 玩法提示（T1：从 manifest.controls 透传）+ proof: Source badge + isolation note */}
       {active ? (
         <div className="flex flex-col gap-1.5">
@@ -266,14 +301,28 @@ function resolveErrorMessage(e: ResolveErrorInfo | null): string {
 
 function LoadingOverlay({ controls }: { controls: string }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-surface-inset/80 px-6 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div
+      className="absolute inset-0 grid place-items-center overflow-hidden px-6"
+      style={{ background: "radial-gradient(circle at 50% 42%, rgba(192,59,255,.22), transparent 60%), rgba(16,12,24,.86)" }}
+    >
+      {/* 招牌 aura（参考设计）：缓慢旋转的彩色光晕 */}
+      <span
+        className="yh-aura pointer-events-none absolute h-72 w-72 rounded-full blur-2xl"
+        style={{
+          background:
+            "conic-gradient(from 0deg, rgba(255,59,167,.22), rgba(192,59,255,.05), rgba(39,224,255,.18), rgba(255,59,167,.22))",
+        }}
+        aria-hidden
+      />
+      <div className="relative flex flex-col items-center gap-3 text-center">
         <span
-          className="h-8 w-8 animate-spin rounded-full border-2 border-hairline-strong"
-          style={{ borderTopColor: "var(--running)" }}
+          className="h-11 w-11 animate-spin rounded-full border-[3px] border-hairline-strong"
+          style={{ borderTopColor: "var(--running)", boxShadow: "0 0 26px rgba(39,224,255,.4)" }}
           aria-hidden
         />
-        <p className="text-sm text-ink-muted">正在加载远端游戏文件…</p>
+        <p className="text-[13px] font-medium" style={{ color: "var(--running)" }}>
+          载入中 · 拉取远端 bundle…
+        </p>
         {controls ? <p className="text-[12px] text-ink-faint">玩法：{controls}</p> : null}
       </div>
     </div>

@@ -16,23 +16,25 @@ export function GameCard({ game }: { game: GameCardData }) {
   return (
     <div className="group block">
       <Link href={`/play/${game.id}`} className="block">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset shadow-[0_8px_20px_-12px_rgba(0,0,0,.6)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(.2,.7,.2,1)] group-hover:-translate-y-1.5 group-hover:shadow-[0_14px_36px_-8px_rgba(192,59,255,.5)]">
           {game.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- 跨域 MinIO 封面，刻意不用 next/image
             <img
               src={game.coverUrl}
               alt={game.title}
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           ) : (
             <div className="h-full w-full bg-grad-play opacity-30" aria-hidden />
           )}
-          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
             ▶ {game.playCount}
           </span>
         </div>
 
-        <h3 className="mt-2 truncate text-[15px] font-bold text-ink group-hover:text-ink">{game.title}</h3>
+        <h3 className="mt-2.5 truncate text-[15px] font-bold text-ink transition-colors group-hover:text-brand-cyan">
+          {game.title}
+        </h3>
       </Link>
 
       {game.summary ? (

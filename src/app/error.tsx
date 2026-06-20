@@ -1,6 +1,6 @@
 "use client";
 
-import { Brand } from "@/components/brand/StarLogo";
+import { Brand } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 
 // 暗底品牌化错误边界（V4）：路由段渲染抛错时不掉默认白底页，给重试 + 返回首页。

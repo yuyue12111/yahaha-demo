@@ -97,3 +97,27 @@
   .yh-pop { animation: none; }
   .yh-shimmer-track::after { animation: none; }
 }
+
+/* 前端重构 Phase 1：参考设计的招牌动效（docs/10 视觉基调），可复用工具类 */
+@keyframes yh-floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes yh-dotpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes yh-auraspin { to { transform: rotate(360deg); } }
+@keyframes yh-sheen { 0% { transform: translateX(-160%); } 55%,100% { transform: translateX(240%); } }
+@keyframes yh-reveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.yh-floaty { animation: yh-floaty 4.5s ease-in-out infinite; }
+.yh-dotpulse { animation: yh-dotpulse 1.4s ease-in-out infinite; }
+.yh-aura { animation: yh-auraspin 14s linear infinite; }
+.yh-reveal { animation: yh-reveal 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+/* play CTA 上的扫光（限定在自身 overflow-hidden 容器内绝对定位的 ::after） */
+.yh-sheen { position: relative; overflow: hidden; }
+.yh-sheen::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  transform: translateX(-160%); animation: yh-sheen 5s ease-in-out infinite; pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yh-floaty, .yh-dotpulse, .yh-aura, .yh-reveal { animation: none; }
+  .yh-sheen::after { animation: none; opacity: 0; }
+}

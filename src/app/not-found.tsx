@@ -1,4 +1,4 @@
-import { Brand } from "@/components/brand/StarLogo";
+import { Brand } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 
 // 暗底品牌化 404（V4）：坏链不再掉 Next 默认白底页、撞碎暗色品牌。

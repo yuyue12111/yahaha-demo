@@ -7,10 +7,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-end gap-3 border-b border-hairline px-6">
+        <header
+          className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-end gap-3 border-b border-hairline px-6 backdrop-blur"
+          style={{ background: "color-mix(in srgb, var(--bg) 82%, transparent)" }}
+        >
           <UserMenu />
         </header>
-        <main className="flex-1 px-6 py-6">{children}</main>
+        <main className="flex-1 px-6 py-8">{children}</main>
       </div>
     </div>
   );
