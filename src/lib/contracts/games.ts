@@ -30,3 +30,37 @@ export const GamesListResponse = z.object({
   nextCursor: z.string().optional(),
 });
 export type GamesListResponse = z.infer<typeof GamesListResponse>;
+
+/**
+ * GET /api/games/:id 响应（docs/03:31）。游戏 meta + 作者 + 活跃版本摘要 + 统计。
+ * `liked/favorited` 为可选（like/favorite 仍 deferred，故缺省不返回）。
+ * activeVersion 取自 DB 关系（轻量，不做 MinIO HEAD）；Play 解析仍走 active-version 端点。
+ */
+export const GameDetail = z.object({
+  game: z.object({
+    id: z.string().min(1),
+    title: z.string(),
+    summary: z.string(),
+    tags: z.array(z.string()),
+    coverUrl: z.string().url().nullable(),
+    status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
+    publishedAt: z.string().nullable(),
+    createdAt: z.string(),
+  }),
+  author: z.object({ id: z.string(), displayName: z.string() }),
+  activeVersion: z
+    .object({
+      id: z.string(),
+      versionNumber: z.number().int().positive(),
+      runtime: RuntimeKind,
+    })
+    .nullable(),
+  stats: z.object({
+    likes: z.number().int().nonnegative(),
+    favorites: z.number().int().nonnegative(),
+    playCount: z.number().int().nonnegative(),
+  }),
+  liked: z.boolean().optional(),
+  favorited: z.boolean().optional(),
+});
+export type GameDetail = z.infer<typeof GameDetail>;
