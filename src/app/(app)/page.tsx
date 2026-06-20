@@ -61,9 +61,9 @@ export default async function HomePage({
 
   return (
     <div className="max-w-[1400px]">
-      <GameRow title="玩家之选" subtitle="玩的人最多" games={popular} size="lg" />
-      <GameRow title="Trending" subtitle="近 7 天增长最快" games={trending} />
-      <GameRow title="为你推荐" subtitle="系统为你挑选" games={recommended} />
+      <GameRow title="Players' Choice" games={popular} size="lg" />
+      <GameRow title="Trending" games={trending} />
+      <GameRow title="Recommended For You" games={recommended} />
     </div>
   );
 }
