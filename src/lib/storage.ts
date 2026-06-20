@@ -9,6 +9,9 @@ import {
   GetObjectCommand,
   PutObjectCommand,
   HeadObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "./env";
@@ -87,6 +90,37 @@ export async function objectExists(key: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Delete a single object (maintainer ops — T2-1). Object-storage 删除只允许出现在本文件（红线①）。 */
+export async function deleteObject(key: string): Promise<void> {
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+/**
+ * Delete every object under a key prefix (e.g. `games/{id}/` = a game's whole bundle tree).
+ * Paginated list + batched delete. Returns the count removed (best-effort; caller may ignore).
+ */
+export async function deletePrefix(prefix: string): Promise<number> {
+  let deleted = 0;
+  let token: string | undefined;
+  do {
+    const listed = await s3.send(
+      new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token }),
+    );
+    const objects = (listed.Contents ?? [])
+      .map((o) => o.Key)
+      .filter((k): k is string => !!k)
+      .map((Key) => ({ Key }));
+    if (objects.length > 0) {
+      await s3.send(
+        new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: objects, Quiet: true } }),
+      );
+      deleted += objects.length;
+    }
+    token = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+  } while (token);
+  return deleted;
 }
 
 /**
