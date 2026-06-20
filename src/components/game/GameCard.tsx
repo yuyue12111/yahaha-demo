@@ -54,8 +54,8 @@ export function GameCard({
         ) : (
           <div className="h-full w-full" style={{ background: coverFallback(game.id) }} aria-hidden />
         )}
-        {/* 整封面可点 → Play（覆盖层，让书签按钮叠在更上层） */}
-        <Link href={`/play/${game.id}`} aria-label={game.title} className="absolute inset-0 z-[1]" />
+        {/* 整封面可点 → 详情页（看简介/标签/玩法/作者再决定玩；详情页有醒目「立即游玩」）。书签按钮叠更上层 */}
+        <Link href={`/games/${game.id}`} aria-label={game.title} className="absolute inset-0 z-[1]" />
         <span className="pointer-events-none absolute bottom-2 left-2 z-[1] inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
           ▶ {formatPlays(game.playCount)}
         </span>
@@ -64,7 +64,7 @@ export function GameCard({
         ) : null}
       </div>
 
-      <Link href={`/play/${game.id}`} className="block">
+      <Link href={`/games/${game.id}`} className="block">
         <h3 className="mt-2.5 truncate text-[15px] font-bold text-ink transition-colors group-hover:text-brand-cyan">
           {game.title}
         </h3>
