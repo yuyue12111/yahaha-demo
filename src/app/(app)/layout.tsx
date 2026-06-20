@@ -19,7 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           className="sticky top-0 z-20 hidden h-16 shrink-0 items-center gap-3 border-b border-hairline px-8 backdrop-blur md:flex"
           style={{ background: "color-mix(in srgb, var(--bg) 82%, transparent)" }}
         >
-          <form method="get" action="/" className="relative w-full max-w-2xl flex-1">
+          <form method="get" action="/" className="relative min-w-0 flex-1">
             <svg
               className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint"
               width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"

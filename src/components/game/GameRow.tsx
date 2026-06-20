@@ -12,11 +12,15 @@ export function GameRow({
   title,
   subtitle,
   games,
+  size = "sm",
 }: {
   title: string;
   subtitle?: string;
   games: GameCardData[];
+  /** lg = 主打排（玩家之选）更大卡；sm = 次级排（Trending/推荐）。 */
+  size?: "lg" | "sm";
 }) {
+  const cardW = size === "lg" ? "w-[178px] sm:w-[212px]" : "w-[138px] sm:w-[160px]";
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
 
@@ -89,7 +93,7 @@ export function GameRow({
         className="yh-noscrollbar flex cursor-grab gap-4 overflow-x-auto pb-1 active:cursor-grabbing"
       >
         {games.map((g) => (
-          <div key={g.id} className="w-[150px] shrink-0 sm:w-[176px]">
+          <div key={g.id} className={`${cardW} shrink-0`}>
             <GameCard game={g} />
           </div>
         ))}
