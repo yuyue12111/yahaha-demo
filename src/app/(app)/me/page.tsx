@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { listGamesByAuthor, listFavoriteGames, getFavoriteIds } from "@/lib/games";
-import { listRecentTasks, type TaskHistoryItem } from "@/lib/task-history";
+import { listRecentTasks, estimateCostUsd, type TaskHistoryItem } from "@/lib/task-history";
 import { GameCard } from "@/components/game/GameCard";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
 import { Button } from "@/components/ui/Button";
@@ -183,8 +183,21 @@ const TASK_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 function TaskHistoryList({ tasks }: { tasks: TaskHistoryItem[] }) {
+  // 生成成本统计（加分项）：本页任务的 token 合计 + 估算美元成本。
+  const totalTokens = tasks.reduce((s, t) => s + t.totalTokens, 0);
+  const totalCost = estimateCostUsd(totalTokens);
   return (
-    <ul className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-hairline bg-surface-inset px-4 py-2.5 text-[12px]">
+        <span className="text-ink-muted">
+          共 <span className="font-bold text-ink">{tasks.length}</span> 个生成任务
+        </span>
+        <span className="font-mono text-ink-muted">
+          累计 <span className="font-bold text-ink">{totalTokens.toLocaleString()}</span> tokens · 估算成本 ≈ $
+          <span className="font-bold text-ink">{totalCost.toFixed(4)}</span>
+        </span>
+      </div>
+      <ul className="flex flex-col gap-2">
       {tasks.map((t) => {
         const s = TASK_STATUS[t.status] ?? { label: t.status, color: "var(--text-muted)" };
         return (
@@ -204,6 +217,7 @@ function TaskHistoryList({ tasks }: { tasks: TaskHistoryItem[] }) {
             <span className="shrink-0 font-mono text-[11px] text-ink-faint">
               {t.modelProvider ? `${t.modelProvider} · ` : ""}
               {t.createdAt.slice(0, 16).replace("T", " ")}
+              {t.totalTokens ? ` · ${t.totalTokens.toLocaleString()} tok` : ""}
               {t.attempt > 0 ? ` · 重试${t.attempt}` : ""}
             </span>
             <span className="shrink-0">
@@ -228,7 +242,8 @@ function TaskHistoryList({ tasks }: { tasks: TaskHistoryItem[] }) {
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { env } from "./env";
 import type { TaskStatus } from "./contracts/tasks";
 
 /**
@@ -15,6 +16,8 @@ export type TaskHistoryItem = {
   gamePublished: boolean;
   modelProvider: string | null;
   attempt: number;
+  /** 生成成本统计（加分项）：该任务 6 节点 AgentLog 的 token 总量（in+out）。 */
+  totalTokens: number;
 };
 
 export async function listRecentTasks(userId: string, limit = 30): Promise<TaskHistoryItem[]> {
@@ -22,7 +25,10 @@ export async function listRecentTasks(userId: string, limit = 30): Promise<TaskH
     where: { userId },
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: { game: { select: { id: true, title: true, status: true } } },
+    include: {
+      game: { select: { id: true, title: true, status: true } },
+      logs: { select: { tokensIn: true, tokensOut: true } },
+    },
   });
   return rows.map((t) => ({
     id: t.id,
@@ -34,5 +40,11 @@ export async function listRecentTasks(userId: string, limit = 30): Promise<TaskH
     gamePublished: t.game?.status === "PUBLISHED",
     modelProvider: t.modelProvider ?? null,
     attempt: t.attempt,
+    totalTokens: t.logs.reduce((s, l) => s + (l.tokensIn ?? 0) + (l.tokensOut ?? 0), 0),
   }));
+}
+
+/** token → 估算美元成本（env COST_USD_PER_1K_TOKENS，默认 0.01/1k）。mock token 为估算值，故成本亦为估算。 */
+export function estimateCostUsd(totalTokens: number): number {
+  return (totalTokens / 1000) * env.COST_USD_PER_1K_TOKENS;
 }

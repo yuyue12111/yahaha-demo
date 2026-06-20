@@ -5,6 +5,7 @@ import { errorEnvelope } from "@/lib/contracts/error";
 import { CreateTaskRequest, CreateTaskResponse } from "@/lib/contracts/tasks";
 import { enqueueGeneration } from "@/lib/queue";
 import { rateLimitCreateTask } from "@/lib/rate-limit";
+import { moderatePrompt } from "@/lib/moderation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,14 @@ export async function POST(req: Request) {
     );
   }
   const { prompt, assetIds, gameId } = parsed.data;
+
+  // B4：内容审核（docs/07 §内容审核）。命中禁词 → 422 不建任务、不入队（生成前拦截）。
+  const mod = moderatePrompt(prompt);
+  if (!mod.allowed) {
+    return NextResponse.json(errorEnvelope("VALIDATION_ERROR", mod.reason ?? "创意未通过内容审核"), {
+      status: 422,
+    });
+  }
 
   // 若指定 gameId（在已有游戏上再生成）→ 校验归属，越权 403（docs/07 §6）。
   if (gameId) {

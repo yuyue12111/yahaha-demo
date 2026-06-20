@@ -57,6 +57,13 @@ const EnvSchema = z.object({
   RATE_LIMIT_TASKS: intDefault(10), // 每窗口最多新建任务数
   RATE_LIMIT_WINDOW_SEC: intDefault(60),
   RATE_LIMIT_PLAY_EVENTS: intDefault(30), // 每窗口每 (uid|IP) 最多 play-event 数（防刷 playCount）
+
+  // ---- 生成成本统计（加分项）：token → 估算美元单价（默认 0.01/1k；mock token 为估算值） ----
+  COST_USD_PER_1K_TOKENS: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== "" ? Number(v) : 0.01))
+    .pipe(z.number().nonnegative()),
 });
 
 export const env = EnvSchema.parse({
@@ -89,4 +96,5 @@ export const env = EnvSchema.parse({
   RATE_LIMIT_TASKS: process.env.RATE_LIMIT_TASKS,
   RATE_LIMIT_WINDOW_SEC: process.env.RATE_LIMIT_WINDOW_SEC,
   RATE_LIMIT_PLAY_EVENTS: process.env.RATE_LIMIT_PLAY_EVENTS,
+  COST_USD_PER_1K_TOKENS: process.env.COST_USD_PER_1K_TOKENS,
 });

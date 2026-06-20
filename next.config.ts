@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: `frame-src 'self' ${s3Public}; frame-ancestors 'none'`,
           },
+          // 纵深安全 headers（B4）：均不影响游戏 iframe（frame-src 已显式允 MinIO 产物源）。
+          { key: "X-Content-Type-Options", value: "nosniff" }, // 禁 MIME 嗅探
+          { key: "X-Frame-Options", value: "DENY" }, // frame-ancestors 的旧浏览器兜底（本站不被内嵌）
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
         ],
       },
     ];
