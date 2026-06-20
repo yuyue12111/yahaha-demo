@@ -355,7 +355,7 @@ export function CreateStudio({
                     </div>
                     {hasTokens ? (
                       <div className="mt-2 font-mono text-[11px] text-ink-faint">
-                        Σ 生成成本（mock 估算）· {tokenTotal.in} in / {tokenTotal.out} out ·{" "}
+                        Σ token 成本 · {tokenTotal.in} in / {tokenTotal.out} out ·{" "}
                         {tokenTotal.in + tokenTotal.out} tok
                       </div>
                     ) : null}

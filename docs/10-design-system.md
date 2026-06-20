@@ -1,6 +1,9 @@
 # 10 · 设计系统契约（视觉基调）
 
-> 平台艺术风格的**权威源**。基调 = **方向 A 霓虹街机为底 + 方向 B 的克制**（更大圆角、细描边、更多留白）。
+> **设计权威（2026-06-20 起）**：以 **Claude Design handoff 参考**（`Yahaha Design Reference.dc.html` + `Yahaha Logo Concepts.dc.html` + `Yahaha Intro.dc.html`）为视觉/版式的**最高来源**；本 doc 与之**冲突时以参考为准**，并据其更新（如 logo、Create 聊天式、侧栏、入场动画）。
+> **但**：设计**永不**改动 `CLAUDE.md §2` 的五条 Fatal 红线与 NEVER-CUT floor（存储边界只在 `storage.ts` · Play 跨域 sandbox `allow-scripts` 无 `allow-same-origin` + 远端 iframe.src + Source 徽章 · 202+独立 worker+≥3 节点 · ModelClient seam · 一条 `docker compose up` 可复现）。视觉优先级永远低于红线。
+>
+> 平台艺术风格的基调 = **方向 A 霓虹街机为底 + 方向 B 的克制**（更大圆角、细描边、更多留白）。
 > 参考 Astrocade：暗色 plum 底、内容为王、双招牌渐变（Play=洋红紫 / Create=青蓝）、**Y-fork 品牌符号**、胶囊主操作。
 > （品牌符号 2026-06-20 由「通用五角星」更新为 **Y-fork**：两臂双渐变=两条旅程，汇成白色主干=首字母 Y / 双路合一。见 Claude Design handoff。）
 > 设计**不计分**，定位是让 demo 专业且有「参考 Astrocade」那味儿；落地走 Tailwind theme + shadcn/ui，**单暗色主题**。
