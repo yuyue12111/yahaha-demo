@@ -3,37 +3,57 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * 入场动画（参考稿 `Yahaha Intro.dc.html`）：canvas 粒子从四周飞入，沿三段汇聚成 Y-fork
- * （左臂洋红 / 右臂青 / 主干紫→绿）+ 双光束扫过 + 中心辉光；~3s「YaHaHa」字标 + tagline 逐字浮现；
- * ~4.35s 爆散 → 覆盖层淡出，露出底下真实 app（非参考稿里的 mock home）。
+ * 入场动画（参考稿 `Yahaha Pixel Intro`）：街机点阵场上，~?? 个像素从四周飞入、沿三段汇聚拼成
+ * **像素霓虹 Y-fork**（左臂洋红 / 右臂青 / 主干紫 / 中心白热），点亮后霓虹 bloom + CRT 扫描线脉冲；
+ * 「LOADING YAHAHA」字样淡出 → 覆盖层淡出，露出底下真实 app（其侧栏 logo 即同款像素 Y，视觉连贯）。
  *
  * 落地差异：作为 fixed inset-0 覆盖层盖在真 app 上，播完淡出卸载。每会话一次（sessionStorage）、
- * `prefers-reduced-motion` 直接跳过、Skip/重播按钮。纯 canvas 2D，无依赖、离线安全，对红线零影响（纯展示）。
+ * `prefers-reduced-motion` 直接跳过、Skip 按钮。纯 canvas 2D，无依赖、离线安全，对红线零影响（纯展示）。
  */
 
-type Part = {
-  sx: number; sy: number; tx: number; ty: number;
-  free: boolean; col: string; size: number; ph: number; spd: number; bvx: number; bvy: number;
-};
-
 const SEEN_KEY = "yahaha-intro-seen";
+const N = 18;
+
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+].map((r) => r.map((v) => (v + 0.5) / 16));
+
+const SEGS: { a: [number, number]; b: [number, number]; c: string }[] = [
+  { a: [0.23, 0.18], b: [0.5, 0.5], c: "#FF3BA7" },
+  { a: [0.77, 0.18], b: [0.5, 0.5], c: "#27E0FF" },
+  { a: [0.5, 0.5], b: [0.5, 0.87], c: "#C03BFF" },
+];
+
+function segDist(px: number, py: number, a: [number, number], b: [number, number]): number {
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1],
+    L = dx * dx + dy * dy || 1;
+  let t = ((px - a[0]) * dx + (py - a[1]) * dy) / L;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+}
+
+type Pix = { tx: number; ty: number; col: string; sx: number; sy: number };
 
 export function IntroOverlay() {
   const [gone, setGone] = useState(false); // 完全卸载
   const [revealing, setRevealing] = useState(false); // 淡出露出 app
-  const [wordmark, setWordmark] = useState(false);
+  const [lit, setLit] = useState(false); // LOADING 字样淡出
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const kickRef = useRef<number | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t0Ref = useRef(0);
-  const stateRef = useRef<{ parts: Part[]; cx: number; cy: number; W: number; H: number; ctx: CanvasRenderingContext2D | null }>({
-    parts: [], cx: 0, cy: 0, W: 0, H: 0, ctx: null,
-  });
+  const ipRef = useRef<Pix[] | null>(null);
+  const cwRef = useRef(0);
 
   useEffect(() => {
-    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce =
+      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let seen = false;
     try {
       seen = !!window.sessionStorage.getItem(SEEN_KEY);
@@ -59,133 +79,120 @@ export function IntroOverlay() {
       timersRef.current = [];
     };
 
-    const setup = () => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = c.clientWidth || window.innerWidth;
-      const h = c.clientHeight || window.innerHeight;
-      c.width = w * dpr;
-      c.height = h * dpr;
-      const ctx = c.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const cx = w / 2, cy = h / 2, s = Math.min(w, h) * 0.205;
-      const A: [number, number] = [cx - s, cy - s * 1.25];
-      const B: [number, number] = [cx + s, cy - s * 1.25];
-      const M: [number, number] = [cx, cy - s * 0.02];
-      const S: [number, number] = [cx, cy + s * 1.5];
-      const lerp = (p: number[], q: number[], t: number): [number, number] => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
-      const dens = 1;
-      const perSeg = Math.round(205 * dens);
-      const targets: { x: number; y: number; tag: "L" | "R" | "S" }[] = [];
-      ([[A, M, "L"], [B, M, "R"], [M, S, "S"]] as [number[], number[], "L" | "R" | "S"][]).forEach(([p, q, tag]) => {
-        const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len, ny = dx / len;
-        for (let i = 0; i < perSeg; i++) {
-          const t = i / (perSeg - 1);
-          const b = lerp(p, q, t);
-          const j = (Math.random() - 0.5) * s * 0.11;
-          targets.push({ x: b[0] + nx * j, y: b[1] + ny * j, tag });
+    const ease = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : 1 - Math.pow(1 - t, 3));
+
+    const initIP = (W: number, H: number) => {
+      const cw = W / N;
+      cwRef.current = cw;
+      const ch = H / N;
+      const cxv = W * 0.5,
+        cyv = H * 0.47;
+      const ip: Pix[] = [];
+      for (let gy = 0; gy < N; gy++)
+        for (let gx = 0; gx < N; gx++) {
+          const nx = (gx + 0.5) / N,
+            ny = (gy + 0.5) / N;
+          let best = 9,
+            col = "#fff";
+          for (const s of SEGS) {
+            const d = segDist(nx, ny, s.a, s.b);
+            if (d < best) {
+              best = d;
+              col = s.c;
+            }
+          }
+          if (best <= 0.072) {
+            const ang = Math.random() * 6.283,
+              rad = Math.max(W, H) * (0.55 + Math.random() * 0.65);
+            ip.push({ tx: gx * cw + cw / 2, ty: gy * ch + ch / 2, col, sx: cxv + Math.cos(ang) * rad, sy: cyv + Math.sin(ang) * rad });
+          }
         }
-      });
-      const pal: Record<string, [string, string]> = { L: ["#FF3BA7", "#C03BFF"], R: ["#27E0FF", "#3B82F6"], S: ["#C03BFF", "#5DE2B0"] };
-      const N = targets.length;
-      const free = Math.floor(N * 0.4);
-      const parts: Part[] = [];
-      for (let i = 0; i < N + free; i++) {
-        const isFree = i >= N;
-        const tgt = isFree ? null : targets[i];
-        const ang = Math.random() * Math.PI * 2, rad = Math.max(w, h) * (0.4 + Math.random() * 0.65);
-        const sx = cx + Math.cos(ang) * rad, sy = cy + Math.sin(ang) * rad * 0.8;
-        const col = isFree
-          ? (Math.random() < 0.5 ? "#7C5CFF" : "#27E0FF")
-          : (Math.random() < 0.5 ? pal[tgt!.tag][0] : pal[tgt!.tag][1]);
-        parts.push({
-          sx, sy,
-          tx: isFree ? sx : tgt!.x, ty: isFree ? sy : tgt!.y,
-          free: isFree, col,
-          size: isFree ? Math.random() * 1.1 + 0.4 : Math.random() * 1.5 + 0.8,
-          ph: Math.random() * Math.PI * 2, spd: 0.5 + Math.random() * 0.8,
-          bvx: Math.random() - 0.5, bvy: Math.random() - 0.5,
-        });
+      ipRef.current = ip;
+    };
+
+    const drawPixelLogo = (ctx: CanvasRenderingContext2D, W: number, H: number, o: { glow: number; alpha: number; t: number }) => {
+      const cw = W / N,
+        ch = H / N;
+      const sp = document.createElement("canvas");
+      sp.width = W;
+      sp.height = H;
+      const sx = sp.getContext("2d");
+      if (!sx) return;
+      const thick = 0.072,
+        soft = 0.17;
+      for (let gy = 0; gy < N; gy++)
+        for (let gx = 0; gx < N; gx++) {
+          const nx = (gx + 0.5) / N,
+            ny = (gy + 0.5) / N;
+          let best = 9,
+            col = "#fff";
+          for (const s of SEGS) {
+            const d = segDist(nx, ny, s.a, s.b);
+            if (d < best) {
+              best = d;
+              col = s.c;
+            }
+          }
+          let inten = 0;
+          if (best <= thick) inten = 1;
+          else {
+            const a = 1 - (best - thick) / soft;
+            if (a > 0 && a > BAYER[gy % 4][gx % 4]) inten = 0.4 + 0.45 * a;
+          }
+          if (inten <= 0) continue;
+          let color = col;
+          const dM = Math.hypot(nx - 0.5, ny - 0.47);
+          if (dM < 0.13) color = "#FFFFFF";
+          sx.globalAlpha = Math.min(1, inten);
+          sx.fillStyle = color;
+          const pad = Math.max(1, cw * 0.1);
+          sx.fillRect(Math.floor(gx * cw) + pad, Math.floor(gy * ch) + pad, Math.ceil(cw) - 2 * pad, Math.ceil(ch) - 2 * pad);
+        }
+      ctx.save();
+      ctx.globalAlpha = 0.7 * o.alpha;
+      ctx.filter = "blur(" + o.glow + "px)";
+      ctx.drawImage(sp, 0, 0);
+      ctx.restore();
+      ctx.globalAlpha = o.alpha;
+      ctx.drawImage(sp, 0, 0);
+      ctx.globalAlpha = 0.13 * o.alpha;
+      ctx.fillStyle = "#05030a";
+      const off = (o.t * 24) % 3;
+      for (let y = -3 + off; y < H; y += 3) ctx.fillRect(0, y, W, 1.3);
+      ctx.globalAlpha = 1;
+    };
+
+    const drawIntro = (cv: HTMLCanvasElement, t: number) => {
+      const ctx = cv.getContext("2d");
+      if (!ctx) return;
+      const W = cv.width,
+        H = cv.height;
+      if (!ipRef.current) initIP(W, H);
+      ctx.clearRect(0, 0, W, H);
+      const staticA = Math.max(0, Math.min(1, (t - 1.25) / 0.55));
+      const partA = 1 - staticA;
+      if (partA > 0.01 && ipRef.current) {
+        const pr = ease(Math.min(1, t / 1.5));
+        const s = cwRef.current * 0.82;
+        for (const p of ipRef.current) {
+          const x = p.sx + (p.tx - p.sx) * pr,
+            y = p.sy + (p.ty - p.sy) * pr;
+          ctx.globalAlpha = partA * (0.45 + 0.55 * pr);
+          ctx.fillStyle = p.col;
+          ctx.fillRect(x - s / 2, y - s / 2, s, s);
+        }
+        ctx.globalAlpha = 1;
       }
-      stateRef.current = { parts, cx, cy, W: w, H: h, ctx };
+      if (staticA > 0.01) {
+        const pulse = t > 2.7 ? 1 + 0.16 * Math.sin(t * 1.8) : 1;
+        drawPixelLogo(ctx, W, H, { glow: 9 * pulse, alpha: staticA, t });
+      }
     };
 
     const loop = () => {
-      const { ctx, parts, cx, cy, W: w, H: h } = stateRef.current;
-      if (!ctx) return;
       const el = (performance.now() - t0Ref.current) / 1000;
-      const ease = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : 1 - Math.pow(1 - t, 3));
-      const conv = ease((el - 1.0) / 2.0);
-      const burst = Math.max(0, el - 4.35);
-
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(8,5,16,0.32)";
-      ctx.fillRect(0, 0, w, h);
-
-      ctx.globalCompositeOperation = "lighter";
-      for (const p of parts) {
-        let x: number, y: number, a: number, sz: number;
-        const drift = Math.sin(el * p.spd + p.ph);
-        if (p.free) {
-          x = p.sx + drift * 14 + p.bvx * el * 7;
-          y = p.sy + Math.cos(el * p.spd + p.ph) * 14 + p.bvy * el * 7;
-          a = 0.16 * Math.min(1, el / 0.9) * (burst > 0 ? Math.max(0, 1 - burst * 1.3) : 1);
-          sz = p.size;
-        } else {
-          let bx = p.sx + (p.tx - p.sx) * conv, by = p.sy + (p.ty - p.sy) * conv;
-          bx += drift * (1 - conv) * 10;
-          by += Math.cos(el * p.spd + p.ph) * (1 - conv) * 10;
-          if (burst > 0) {
-            const dx = p.tx - cx, dy = p.ty - cy, len = Math.hypot(dx, dy) || 1;
-            const v = burst * burst * 460;
-            bx = p.tx + (dx / len) * v + p.bvx * burst * 70;
-            by = p.ty + (dy / len) * v + p.bvy * burst * 70;
-          }
-          x = bx; y = by;
-          const solid = Math.min(1, Math.max(0, (el - 1.0) / 2.2));
-          a = (0.24 + 0.62 * solid) * Math.min(1, el / 0.6);
-          if (burst > 0) a *= Math.max(0, 1 - burst * 1.2);
-          sz = p.size * (1 + conv * 0.55);
-        }
-        if (a <= 0) continue;
-        ctx.globalAlpha = a;
-        ctx.fillStyle = p.col;
-        ctx.beginPath();
-        ctx.arc(x, y, sz, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const glow = Math.min(1, Math.max(0, (el - 2.5) / 1.5)) * (burst > 0 ? Math.max(0, 1 - burst * 1.5) : 1);
-      if (glow > 0) {
-        ctx.globalAlpha = glow * 0.5;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.42);
-        g.addColorStop(0, "rgba(192,59,255,0.5)");
-        g.addColorStop(0.5, "rgba(124,92,255,0.14)");
-        g.addColorStop(1, "rgba(124,92,255,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-      }
-
-      const sweep = (el - 1.4) / 1.9;
-      if (sweep >= 0 && sweep <= 1) {
-        const fade = 0.12 * Math.max(0, 1 - Math.abs(sweep - 0.5) * 1.4);
-        const beam = (x: number, col: string) => {
-          const grad = ctx.createLinearGradient(x - 150, 0, x + 150, 0);
-          grad.addColorStop(0, "rgba(0,0,0,0)");
-          grad.addColorStop(0.5, col);
-          grad.addColorStop(1, "rgba(0,0,0,0)");
-          ctx.globalAlpha = fade;
-          ctx.fillStyle = grad;
-          ctx.fillRect(x - 150, 0, 300, h);
-        };
-        beam(sweep * w, "rgba(255,59,167,1)");
-        beam((1 - sweep) * w, "rgba(39,224,255,1)");
-      }
-
-      ctx.globalAlpha = 1;
+      const c = canvasRef.current;
+      if (c) drawIntro(c, el);
       if (el < 7.5) rafRef.current = requestAnimationFrame(loop);
       else rafRef.current = null;
     };
@@ -196,19 +203,22 @@ export function IntroOverlay() {
         kickRef.current = requestAnimationFrame(begin);
         return;
       }
-      setup();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      c.width = Math.round(c.clientWidth * dpr);
+      c.height = Math.round(c.clientHeight * dpr);
+      ipRef.current = null;
       t0Ref.current = performance.now();
       loop();
     };
     begin();
 
-    timersRef.current.push(setTimeout(() => setWordmark(true), 3000));
-    timersRef.current.push(setTimeout(() => setRevealing(true), 4350));
+    timersRef.current.push(setTimeout(() => setLit(true), 2100));
+    timersRef.current.push(setTimeout(() => setRevealing(true), 3300));
     timersRef.current.push(
       setTimeout(() => {
         stop();
         setGone(true);
-      }, 5400),
+      }, 4300),
     );
 
     return stop;
@@ -223,61 +233,57 @@ export function IntroOverlay() {
     setTimeout(() => setGone(true), 600);
   };
 
-  // 入场动画为每会话一次的进场；播完淡出即卸载，不在各页留浮动入口。
   if (gone) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] overflow-hidden transition-opacity duration-[900ms] ease-out"
+      className="fixed inset-0 z-[100] overflow-hidden transition-opacity duration-[800ms] ease-out"
       style={{
-        background: "radial-gradient(130% 120% at 50% 38%,#160c28 0%,#0a0612 60%,#06040d 100%)",
+        background: "#08050F",
         opacity: revealing ? 0 : 1,
         pointerEvents: revealing ? "none" : "auto",
       }}
       role="presentation"
     >
-      {/* 装饰层各自 aria-hidden（不在根加，否则会把可聚焦的「跳过」钮埋进隐藏子树，违反 aria-hidden-focus） */}
-      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" aria-hidden />
-      {/* 暗角 vignette */}
+      {/* 街机点阵场 + CRT 横扫 + 中心辉光（参考稿 overlay） */}
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(120% 100% at 50% 50%,transparent 52%,rgba(6,4,13,.55) 100%)" }}
+        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px)", backgroundSize: "5px 5px" }}
         aria-hidden
       />
-      {/* wordmark + tagline */}
-      <div className="pointer-events-none absolute left-0 right-0 top-[63%] text-center" aria-hidden>
-        <div className="text-[clamp(28px,4.4vw,46px)] font-extrabold leading-none tracking-[0.04em]">
-          {["Y", "a", "h", "a", "h", "a"].map((ch, i) => (
-            <span
-              key={i}
-              className="inline-block transition-[opacity,transform] duration-700 ease-[cubic-bezier(.2,.7,.2,1)]"
-              style={{
-                color: "#F4F1FA",
-                textShadow: "0 0 22px rgba(192,59,255,.5), 0 0 8px rgba(39,224,255,.35)",
-                transitionDelay: `${i * 0.085}s`,
-                opacity: wordmark ? 1 : 0,
-                transform: wordmark ? "none" : "translateY(16px)",
-              }}
-            >
-              {ch}
-            </span>
-          ))}
-        </div>
-        <div
-          className="mt-4 text-[14.5px] tracking-[0.02em] text-ink-muted transition-opacity duration-700"
-          style={{ transitionDelay: "0.6s", opacity: wordmark ? 1 : 0 }}
-        >
-          从一句话，到一个可玩的世界
-        </div>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "repeating-linear-gradient(0deg,rgba(5,3,10,.5) 0,rgba(5,3,10,.5) 1.4px,transparent 1.4px,transparent 3px)" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "radial-gradient(120% 110% at 50% 47%,rgba(124,92,255,.12),transparent 60%)" }}
+        aria-hidden
+      />
+
+      {/* 像素 Y 拼合 canvas（居中，逻辑 47% 高与粒子汇聚锚点一致） */}
+      <div className="pointer-events-none absolute left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2" aria-hidden>
+        <canvas ref={canvasRef} className="block h-[min(58vw,260px)] w-[min(58vw,260px)]" style={{ imageRendering: "pixelated" }} />
       </div>
+
+      {/* LOADING 字样 */}
+      <div
+        className="pointer-events-none absolute left-0 right-0 top-[64%] text-center font-mono text-[11px] tracking-[0.32em] transition-opacity duration-500"
+        style={{ color: "#5A5470", opacity: lit ? 0 : 1 }}
+        aria-hidden
+      >
+        L O A D I N G&nbsp;&nbsp;Y A H A H A
+      </div>
+
       {/* skip */}
       <button
         type="button"
         onClick={skip}
         aria-label="跳过入场动画"
-        className="absolute right-7 top-6 z-[6] rounded-pill border border-hairline-strong bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-ink-muted backdrop-blur transition-colors hover:bg-white/10 hover:text-ink"
+        className="absolute right-6 top-5 z-[6] rounded-pill border border-hairline-strong bg-white/[0.04] px-4 py-2 font-mono text-[11px] tracking-[0.05em] text-ink-muted backdrop-blur transition-colors hover:bg-white/10 hover:text-ink"
       >
-        跳过 ▸
+        SKIP ▸
       </button>
     </div>
   );
