@@ -101,6 +101,32 @@ export async function listRecommendedGames(limit = 12): Promise<GameCard[]> {
   return [...items].sort((a, b) => hash(a.id) - hash(b.id)).slice(0, limit);
 }
 
+/** 「我的」页：当前用户的已发布作品 + 草稿数 + 累计游玩（真实，作者维度）。 */
+export async function listGamesByAuthor(
+  authorId: string,
+): Promise<{ published: GameCard[]; draftCount: number; totalPlays: number }> {
+  const rows = await prisma.game.findMany({
+    where: { authorId },
+    include: { author: { select: { id: true, displayName: true } } },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+  });
+  const published: GameCard[] = rows
+    .filter((g) => g.status === "PUBLISHED")
+    .map((g) => ({
+      id: g.id,
+      title: g.title,
+      summary: g.summary,
+      coverUrl: g.coverUrl,
+      tags: g.tags,
+      author: { id: g.author.id, displayName: g.author.displayName },
+      publishedAt: g.publishedAt ? g.publishedAt.toISOString() : null,
+      playCount: g.playCount,
+    }));
+  const draftCount = rows.filter((g) => g.status !== "PUBLISHED").length;
+  const totalPlays = rows.reduce((acc, g) => acc + g.playCount, 0);
+  return { published, draftCount, totalPlays };
+}
+
 /**
  * 已发布游戏的去重标签 + 计数（标签筛选 / 详情用）。按出现次数降序，名称升序兜底。
  */

@@ -54,7 +54,7 @@ export function GameRow({
   if (games.length === 0) return null;
 
   return (
-    <section className="mb-9">
+    <section className="mb-6">
       <header className="mb-3 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[20px] font-extrabold tracking-tight text-ink">{title}</h2>

@@ -1,17 +1,26 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { Brand } from "@/components/brand/Logo";
 
 /**
  * App 外壳（参考稿 Home）：左侧栏（品牌 + 创作主胶囊 + 导航）+ 顶栏（全局搜索 + 通知 + 账号 avatar）。
- * login/register/play 不进此壳。移动端用精简顶栏。
+ * login/register/play 不进此壳。移动端用精简顶栏。侧栏收起态由 cookie 持久（服务端读 → 无水合闪烁）。
  */
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const collapsed = (await cookies()).get("yahaha-sidebar-collapsed")?.value === "1";
   return (
     <div className="flex min-h-screen">
-      <Suspense fallback={<div className="hidden w-[224px] shrink-0 border-r border-hairline bg-surface md:block" />}>
-        <Sidebar />
+      <Suspense
+        fallback={
+          <div
+            className="hidden shrink-0 border-r border-hairline bg-surface md:block"
+            style={{ width: collapsed ? 78 : 244 }}
+          />
+        }
+      >
+        <Sidebar initialCollapsed={collapsed} />
       </Suspense>
       <div className="flex min-w-0 flex-1 flex-col">
         {/* 桌面顶栏：全局搜索（GET → Home 发现）+ 通知 + 账号 */}
@@ -60,7 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Brand size={26} />
           <UserMenu />
         </header>
-        <main className="flex-1 px-5 py-7 md:px-8">{children}</main>
+        <main className="flex-1 px-5 py-5 md:px-8">{children}</main>
       </div>
     </div>
   );
