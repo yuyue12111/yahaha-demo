@@ -13,14 +13,19 @@ export function GameRow({
   subtitle,
   games,
   size = "sm",
+  showBookmark = false,
+  favoritedIds = [],
 }: {
   title: string;
   subtitle?: string;
   games: GameCardData[];
   /** lg = 主打排（玩家之选）更大卡；sm = 次级排（Trending/推荐）。 */
   size?: "lg" | "sm";
+  showBookmark?: boolean;
+  favoritedIds?: string[];
 }) {
   const cardW = size === "lg" ? "w-[178px] sm:w-[212px]" : "w-[138px] sm:w-[160px]";
+  const favSet = new Set(favoritedIds);
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
 
@@ -94,7 +99,7 @@ export function GameRow({
       >
         {games.map((g) => (
           <div key={g.id} className={`${cardW} shrink-0`}>
-            <GameCard game={g} />
+            <GameCard game={g} showBookmark={showBookmark} favorited={favSet.has(g.id)} />
           </div>
         ))}
       </div>

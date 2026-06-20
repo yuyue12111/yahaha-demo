@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-/** 资料页头部操作：编辑（占位，资料/头像/背景编辑为后续）+ 分享（复制本页链接，真实）。 */
+/** 资料页头部操作：分享（复制本页链接，真实）。头像/背景编辑见 ProfileImageUpload（直传）。 */
 export function ProfileActions() {
   const [copied, setCopied] = useState(false);
 
@@ -19,17 +19,6 @@ export function ProfileActions() {
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
-        title="编辑资料（敬请期待）"
-        aria-label="编辑资料"
-        className="grid h-9 w-9 cursor-default place-items-center rounded-full border border-hairline-strong text-ink-muted"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-        </svg>
-      </button>
       <button
         type="button"
         onClick={share}

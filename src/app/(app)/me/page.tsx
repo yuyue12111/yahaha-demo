@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { listGamesByAuthor, listFavoriteGames } from "@/lib/games";
+import { prisma } from "@/lib/db";
+import { listGamesByAuthor, listFavoriteGames, getFavoriteIds } from "@/lib/games";
 import { GameCard } from "@/components/game/GameCard";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
 import { Button } from "@/components/ui/Button";
 import { YForkLogo } from "@/components/brand/Logo";
 import { ProfileActions } from "@/components/profile/ProfileActions";
+import { ProfileImageUpload } from "@/components/profile/ProfileImageUpload";
 
 // 受保护（middleware + 服务端 auth 双守卫）：当前用户的个人主页（参考稿 Astrocade）。
 export const dynamic = "force-dynamic";
@@ -23,18 +25,22 @@ export default async function MePage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login?next=/me");
+  const userId = session.user.id;
 
   const sp = await searchParams;
   const tab = sp.tab === "created" ? "created" : "favorites";
 
-  const name = session.user.name ?? session.user.email ?? "我";
+  const [user, { published, draftCount, totalPlays }, favorites, favoriteIds] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatarUrl: true, bannerUrl: true } }),
+    listGamesByAuthor(userId),
+    listFavoriteGames(userId),
+    getFavoriteIds(userId),
+  ]);
+
+  const name = user?.displayName ?? session.user.name ?? session.user.email ?? "我";
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   const handle = handleFrom(name);
-
-  const [{ published, draftCount, totalPlays }, favorites] = await Promise.all([
-    listGamesByAuthor(session.user.id),
-    listFavoriteGames(session.user.id),
-  ]);
+  const favSet = new Set(favoriteIds);
 
   // Plays 真实；Followers/Following 暂无社交系统 → 0（待社交功能）。
   const stats: { label: string; value: string }[] = [
@@ -47,35 +53,56 @@ export default async function MePage({
     <div className="mx-auto max-w-6xl">
       {/* 资料头：背景板 + 头像 + handle + 统计 */}
       <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
-        {/* 背景板（默认品牌渐变；用户自定义为后续） */}
-        <div
-          className="relative h-36 sm:h-44"
-          style={{
-            background:
-              "radial-gradient(80% 140% at 15% 0%, rgba(192,59,255,.45), transparent 60%), radial-gradient(70% 130% at 85% 10%, rgba(39,224,255,.35), transparent 60%), linear-gradient(120deg,#1a1330,#100c18)",
-          }}
-        >
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,transparent 40%,rgba(22,18,31,.85))" }} />
+        {/* 背景板（用户可换） */}
+        <div className="relative h-36 sm:h-44">
+          {user?.bannerUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.bannerUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{
+                background:
+                  "radial-gradient(80% 140% at 15% 0%, rgba(192,59,255,.45), transparent 60%), radial-gradient(70% 130% at 85% 10%, rgba(39,224,255,.35), transparent 60%), linear-gradient(120deg,#1a1330,#100c18)",
+              }}
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(180deg,transparent 45%,rgba(22,18,31,.9))" }} />
+          <ProfileImageUpload
+            kind="banner"
+            className="absolute right-3 top-3 inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-black/45 px-2.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/65 disabled:opacity-60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L19 7h0a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <circle cx="12" cy="13" r="3.2" />
+            </svg>
+            更换背景
+          </ProfileImageUpload>
         </div>
 
         {/* 头部行 */}
         <div className="px-5 pb-5 sm:px-6">
           <div className="flex flex-wrap items-end gap-4">
-            {/* 头像（覆盖背景板） */}
-            <span className="-mt-12 shrink-0 sm:-mt-14">
-              {session.user.image ? (
+            {/* 头像（覆盖背景板）+ 上传相机 */}
+            <div className="relative -mt-12 shrink-0 sm:-mt-14">
+              {user?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={session.user.image}
-                  alt={name}
-                  className="h-24 w-24 rounded-full border-4 border-surface object-cover shadow-modal"
-                />
+                <img src={user.avatarUrl} alt={name} className="h-24 w-24 rounded-full border-4 border-surface object-cover shadow-modal" />
               ) : (
                 <span className="grid h-24 w-24 place-items-center rounded-full border-4 border-surface bg-grad-create text-[34px] font-extrabold text-[color:var(--grad-create-fg)] shadow-modal">
                   {initial}
                 </span>
               )}
-            </span>
+              <ProfileImageUpload
+                kind="avatar"
+                className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border-2 border-surface bg-surface-2 text-ink-muted transition-colors hover:text-ink disabled:opacity-60"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L19 7h0a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <circle cx="12" cy="13" r="3.2" />
+                </svg>
+              </ProfileImageUpload>
+            </div>
 
             {/* handle + 操作 */}
             <div className="flex min-w-0 items-center gap-3 pb-1">
@@ -86,10 +113,7 @@ export default async function MePage({
             {/* 统计（Plays 真实；Followers/Following 待社交系统） */}
             <div className="ml-auto flex gap-2.5 pb-1">
               {stats.map((s) => (
-                <div
-                  key={s.label}
-                  className="min-w-[86px] rounded-lg border border-hairline bg-surface-inset px-4 py-2.5 text-center"
-                >
+                <div key={s.label} className="min-w-[86px] rounded-lg border border-hairline bg-surface-inset px-4 py-2.5 text-center">
                   <div className="text-[12px] text-ink-muted">{s.label}</div>
                   <div className="mt-0.5 text-[18px] font-extrabold text-ink">{s.value}</div>
                 </div>
@@ -112,20 +136,14 @@ export default async function MePage({
       {/* content */}
       {tab === "favorites" ? (
         favorites.length === 0 ? (
-          <EmptyState
-            title="No favorited games"
-            desc="Games you love will appear here. Tap the bookmark icon on the ones you like!"
-          />
+          <EmptyState title="No favorited games" desc="Games you love will appear here. Tap the bookmark icon on the ones you like!" />
         ) : (
-          <Grid games={favorites} />
+          <Grid games={favorites} favSet={favSet} refreshOnToggle />
         )
       ) : published.length === 0 ? (
-        <EmptyState
-          title="还没有作品"
-          desc={draftCount > 0 ? `有 ${draftCount} 个草稿还没发布。` : "用 AI 把点子跑成可玩游戏。"}
-        />
+        <EmptyState title="还没有作品" desc={draftCount > 0 ? `有 ${draftCount} 个草稿还没发布。` : "用 AI 把点子跑成可玩游戏。"} />
       ) : (
-        <Grid games={published} />
+        <Grid games={published} favSet={favSet} />
       )}
     </div>
   );
@@ -145,11 +163,19 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
   );
 }
 
-function Grid({ games }: { games: GameCardData[] }) {
+function Grid({
+  games,
+  favSet,
+  refreshOnToggle = false,
+}: {
+  games: GameCardData[];
+  favSet: Set<string>;
+  refreshOnToggle?: boolean;
+}) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {games.map((g) => (
-        <GameCard key={g.id} game={g} />
+        <GameCard key={g.id} game={g} showBookmark favorited={favSet.has(g.id)} refreshOnToggle={refreshOnToggle} />
       ))}
     </div>
   );

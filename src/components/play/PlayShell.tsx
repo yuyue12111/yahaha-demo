@@ -8,6 +8,7 @@ import { GameMessage, hostMessage } from "@/lib/contracts/play-messages";
 import { StatePill } from "./StatePill";
 import { SourceBadge } from "./SourceBadge";
 import { YForkLogo } from "@/components/brand/Logo";
+import { BookmarkButton } from "@/components/game/BookmarkButton";
 
 export type PlayStatus = "loading" | "loaded" | "failed" | "ended";
 export type ResolveErrorInfo = { status: number; error: string; detail: string | null };
@@ -18,6 +19,8 @@ export function PlayShell({
   gameId,
   title = "游戏",
   playCount = 0,
+  canFavorite = false,
+  favorited = false,
   active,
   resolveError,
   regenHref = null,
@@ -28,6 +31,9 @@ export function PlayShell({
   title?: string;
   /** 总游玩次数（控制栏真实统计，替代参考稿的假「在线」数）。 */
   playCount?: number;
+  /** 登录态 → 显示收藏书签。 */
+  canFavorite?: boolean;
+  favorited?: boolean;
   active: ActiveVersionResponse | null;
   resolveError: ResolveErrorInfo | null;
   /** 非空（作者本人）→ 显示「生成新版本」入口（B2）。 */
@@ -301,6 +307,7 @@ export function PlayShell({
               <span className="text-ink-faint">▶</span>
               {playCount}
             </span>
+            {canFavorite ? <BookmarkButton gameId={gameId} initialFavorited={favorited} tone="control" /> : null}
             <button
               type="button"
               onClick={handleShare}

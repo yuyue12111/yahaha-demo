@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth";
 import {
   listPublishedGames,
   listPopularGames,
   listTrendingGames,
   listRecommendedGames,
+  getFavoriteIds,
 } from "@/lib/games";
 import { GameCard } from "@/components/game/GameCard";
 import { GameRow } from "@/components/game/GameRow";
@@ -22,6 +24,11 @@ export default async function HomePage({
   const tag = sp.tag?.trim() || undefined;
   const popularView = sp.sort === "popular";
 
+  const session = await auth();
+  const loggedIn = !!session?.user;
+  const favoritedIds = loggedIn ? await getFavoriteIds(session!.user!.id) : [];
+  const favSet = new Set(favoritedIds);
+
   // 搜索 / 标签 / 排行 → 单网格视图
   if (search || tag) {
     const { items } = await listPublishedGames({ search, tag });
@@ -31,12 +38,16 @@ export default async function HomePage({
         count={items.length}
         games={items}
         empty="没有匹配的游戏。"
+        showBookmark={loggedIn}
+        favSet={favSet}
       />
     );
   }
   if (popularView) {
     const items = await listPopularGames(60);
-    return <ResultGrid title="排行榜 · 玩的人最多" count={items.length} games={items} empty="还没有游戏。" />;
+    return (
+      <ResultGrid title="排行榜 · 玩的人最多" count={items.length} games={items} empty="还没有游戏。" showBookmark={loggedIn} favSet={favSet} />
+    );
   }
 
   // 默认 = 三排发现（参考稿 Astrocade 式，可左右拖动）
@@ -61,9 +72,9 @@ export default async function HomePage({
 
   return (
     <div className="max-w-[1400px]">
-      <GameRow title="Players' Choice" games={popular} size="lg" />
-      <GameRow title="Trending" games={trending} />
-      <GameRow title="Recommended For You" games={recommended} />
+      <GameRow title="Players' Choice" games={popular} size="lg" showBookmark={loggedIn} favoritedIds={favoritedIds} />
+      <GameRow title="Trending" games={trending} showBookmark={loggedIn} favoritedIds={favoritedIds} />
+      <GameRow title="Recommended For You" games={recommended} showBookmark={loggedIn} favoritedIds={favoritedIds} />
     </div>
   );
 }
@@ -73,11 +84,15 @@ function ResultGrid({
   count,
   games,
   empty,
+  showBookmark = false,
+  favSet,
 }: {
   title: string;
   count: number;
   games: GameCardData[];
   empty: string;
+  showBookmark?: boolean;
+  favSet: Set<string>;
 }) {
   return (
     <div className="mx-auto max-w-6xl">
@@ -101,7 +116,7 @@ function ResultGrid({
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {games.map((g) => (
-            <GameCard key={g.id} game={g} />
+            <GameCard key={g.id} game={g} showBookmark={showBookmark} favorited={favSet.has(g.id)} />
           ))}
         </div>
       )}
