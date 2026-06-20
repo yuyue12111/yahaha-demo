@@ -1,6 +1,13 @@
 import Link from "next/link";
-import { listPublishedGames, listPublishedTags, type GamesSort } from "@/lib/games";
+import {
+  listPublishedGames,
+  listPopularGames,
+  listTrendingGames,
+  listRecommendedGames,
+} from "@/lib/games";
 import { GameCard } from "@/components/game/GameCard";
+import { GameRow } from "@/components/game/GameRow";
+import type { GameCard as GameCardData } from "@/lib/contracts/games";
 
 // 查库渲染（非写死数组）；force-dynamic 避免 build 期触 DB。
 export const dynamic = "force-dynamic";
@@ -13,97 +20,86 @@ export default async function HomePage({
   const sp = await searchParams;
   const search = sp.search?.trim() || undefined;
   const tag = sp.tag?.trim() || undefined;
-  const sort: GamesSort = sp.sort === "popular" ? "popular" : "newest";
+  const popularView = sp.sort === "popular";
 
-  const [{ items: games }, tags] = await Promise.all([
-    listPublishedGames({ search, tag, sort }),
-    listPublishedTags(),
+  // 搜索 / 标签 / 排行 → 单网格视图
+  if (search || tag) {
+    const { items } = await listPublishedGames({ search, tag });
+    return (
+      <ResultGrid
+        title={search ? `“${search}” 的结果` : `#${tag}`}
+        count={items.length}
+        games={items}
+        empty="没有匹配的游戏。"
+      />
+    );
+  }
+  if (popularView) {
+    const items = await listPopularGames(60);
+    return <ResultGrid title="排行榜 · 玩的人最多" count={items.length} games={items} empty="还没有游戏。" />;
+  }
+
+  // 默认 = 三排发现（参考稿 Astrocade 式，可左右拖动）
+  const [popular, trending, recommended] = await Promise.all([
+    listPopularGames(12),
+    listTrendingGames(12),
+    listRecommendedGames(12),
   ]);
 
-  // 保留当前筛选的 URL（标签切换 / 清除 / 排序经侧栏「排行」）。
-  const hrefWith = (next: { search?: string; tag?: string; sort?: GamesSort }) => {
-    const p = new URLSearchParams();
-    if (next.search) p.set("search", next.search);
-    if (next.tag) p.set("tag", next.tag);
-    if (next.sort && next.sort !== "newest") p.set("sort", next.sort);
-    const q = p.toString();
-    return q ? `/?${q}` : "/";
-  };
-
-  const sectionTitle = search
-    ? `“${search}” 的结果`
-    : tag
-      ? `#${tag}`
-      : sort === "popular"
-        ? "最热门"
-        : "为你精选";
+  if (popular.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl rounded-xl border border-hairline bg-surface px-6 py-16 text-center">
+        <p className="text-ink-muted">
+          还没有已发布的游戏。{" "}
+          <Link href="/create" className="text-brand-cyan underline-offset-2 hover:underline">
+            用 AI 创作第一个 →
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
+    <div className="max-w-[1400px]">
+      <GameRow title="玩家之选" subtitle="玩的人最多" games={popular} />
+      <GameRow title="Trending" subtitle="近 7 天增长最快" games={trending} />
+      <GameRow title="为你推荐" subtitle="系统为你挑选" games={recommended} />
+    </div>
+  );
+}
+
+function ResultGrid({
+  title,
+  count,
+  games,
+  empty,
+}: {
+  title: string;
+  count: number;
+  games: GameCardData[];
+  empty: string;
+}) {
+  return (
     <div className="mx-auto max-w-6xl">
-      {/* 分类筛选 pill 行（真实去重标签，替代写死分类）。 */}
-      {tags.length > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <Link
-            href={hrefWith({ search, sort })}
-            aria-current={!tag ? "page" : undefined}
-            className={`rounded-pill px-4 py-2 text-[13px] transition-colors ${
-              !tag ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-            }`}
-          >
-            全部
-          </Link>
-          {tags.map(({ tag: t }) => {
-            const active = tag === t;
-            return (
-              <Link
-                key={t}
-                href={hrefWith({ search, tag: t, sort })}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-pill px-4 py-2 text-[13px] transition-colors ${
-                  active ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-                }`}
-              >
-                {t}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {/* 区块标题 + 查看全部（参考稿）。 */}
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="truncate text-[18px] font-extrabold text-ink">{sectionTitle}</h2>
-        {search || tag ? (
+        <h2 className="truncate text-[18px] font-extrabold text-ink">{title}</h2>
+        {count > 0 ? (
           <Link href="/" className="shrink-0 text-[13px] text-brand-cyan transition-opacity hover:opacity-80">
-            清除筛选
+            返回发现
           </Link>
-        ) : (
-          <span className="shrink-0 font-mono text-[11px] text-ink-faint">{games.length} 款</span>
-        )}
+        ) : null}
       </div>
-
       {games.length === 0 ? (
         <div className="rounded-xl border border-hairline bg-surface px-6 py-16 text-center">
           <p className="text-ink-muted">
-            {search || tag ? (
-              <>
-                没有匹配的游戏。{" "}
-                <Link href="/" className="text-brand-cyan underline-offset-2 hover:underline">
-                  清除筛选
-                </Link>
-              </>
-            ) : (
-              <>
-                还没有已发布的游戏。{" "}
-                <Link href="/create" className="text-brand-cyan underline-offset-2 hover:underline">
-                  用 AI 创作第一个 →
-                </Link>
-              </>
-            )}
+            {empty}{" "}
+            <Link href="/" className="text-brand-cyan underline-offset-2 hover:underline">
+              返回发现
+            </Link>
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {games.map((g) => (
             <GameCard key={g.id} game={g} />
           ))}

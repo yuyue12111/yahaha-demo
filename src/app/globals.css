@@ -105,6 +105,10 @@
 @keyframes yh-sheen { 0% { transform: translateX(-160%); } 55%,100% { transform: translateX(240%); } }
 @keyframes yh-reveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
+/* 横向卡片轨：隐藏滚动条（保留可拖动/可滚动） */
+.yh-noscrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.yh-noscrollbar::-webkit-scrollbar { display: none; }
+
 .yh-floaty { animation: yh-floaty 4.5s ease-in-out infinite; }
 .yh-dotpulse { animation: yh-dotpulse 1.4s ease-in-out infinite; }
 .yh-aura { animation: yh-auraspin 14s linear infinite; }
