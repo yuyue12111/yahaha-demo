@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { BrandDefs } from "@/components/brand/Logo";
 import { IntroOverlay } from "@/components/brand/IntroOverlay";
+import { ArcadeCursor } from "@/components/brand/ArcadeCursor";
 
 // Vendored (next/font/local) → no build-time network; --font-sans drives the Tailwind sans stack.
 const jakarta = localFont({
@@ -29,6 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {/* 入场动画（每会话一次，盖在真 app 上播完淡出；reduced-motion 跳过） */}
         <IntroOverlay />
+        {/* 街机指针（细指针设备接管系统光标；触屏/reduced-motion 自适配；对红线② 零影响） */}
+        <ArcadeCursor />
       </body>
     </html>
   );
