@@ -16,12 +16,18 @@ const WATCHDOG_MS = 15_000;
 
 export function PlayShell({
   gameId,
+  title = "游戏",
+  playCount = 0,
   active,
   resolveError,
   regenHref = null,
   detailHref = null,
 }: {
   gameId: string;
+  /** 游戏标题（参考稿外壳头部显示）。 */
+  title?: string;
+  /** 总游玩次数（控制栏真实统计，替代参考稿的假「在线」数）。 */
+  playCount?: number;
   active: ActiveVersionResponse | null;
   resolveError: ResolveErrorInfo | null;
   /** 非空（作者本人）→ 显示「生成新版本」入口（B2）。 */
@@ -41,6 +47,7 @@ export function PlayShell({
 
   const [status, setStatus] = useState<PlayStatus>(active ? "loading" : "failed");
   const [score, setScore] = useState(0);
+  const [copied, setCopied] = useState(false); // 分享：复制本页链接的短暂反馈
   const [showStart, setShowStart] = useState(false); // P1：加载后「点击开始」提示，点击聚焦 iframe
   const [fail, setFail] = useState<{ url: string | null; reason: string }>(() =>
     active
@@ -169,107 +176,155 @@ export function PlayShell({
     else void el.requestFullscreen?.().catch(() => {});
   }, []);
 
+  // 分享：复制当前 Play 页链接（真实功能，非装饰）。
+  const handleShare = useCallback(() => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    void navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 px-4 py-6">
-      {/* top bar */}
-      <header className="flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <YForkLogo size={28} />
-          <span className="text-[15px] font-extrabold tracking-tight">Yahaha</span>
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-4 px-4 py-6">
+      {/* 页面顶栏：品牌返回 + owner 入口（详情 / 新版本） */}
+      <div className="flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+          <YForkLogo size={26} />
+          <span className="text-[14px] font-extrabold tracking-tight text-ink">Yahaha</span>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 text-[12px]">
           {detailHref ? (
-            <Link
-              href={detailHref}
-              className="text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
-            >
+            <Link href={detailHref} className="font-medium text-ink-muted transition-colors hover:text-ink">
               详情
             </Link>
           ) : null}
           {regenHref ? (
             <Link
               href={regenHref}
-              className="rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+              className="rounded-pill border border-hairline-strong px-2.5 py-0.5 font-medium text-ink-muted transition-colors hover:text-ink"
             >
               ＋ 新版本
             </Link>
           ) : null}
-          {status === "loaded" || status === "ended" ? (
-            <span className="font-mono text-[12px] text-ink-muted">Score {score}</span>
-          ) : null}
-          <StatePill status={status} />
         </div>
-      </header>
+      </div>
 
-      {/* stage */}
-      <div
-        ref={stageRef}
-        className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-hairline-brand bg-surface-inset"
-      >
+      {/* 运行外壳（参考稿 Play）：头部 title + 状态胶囊 + Source 徽章 · 舞台 · 控制栏 */}
+      <div className="flex flex-col overflow-hidden rounded-xl border border-hairline bg-surface-inset shadow-[0_30px_70px_-34px_rgba(0,0,0,.7),inset_0_1px_0_rgba(255,255,255,.045)]">
+        {/* header */}
+        <div className="flex items-center gap-3 border-b border-hairline bg-surface px-4 py-3">
+          <span className="min-w-0 shrink truncate text-[15px] font-bold text-ink">{title}</span>
+          <StatePill status={status} />
+          <div className="flex-1" />
+          {active ? (
+            <span className="hidden sm:inline-flex">
+              <SourceBadge url={active.entryUrl} />
+            </span>
+          ) : null}
+        </div>
+
+        {/* stage */}
+        <div
+          ref={stageRef}
+          className="relative aspect-[16/10] w-full overflow-hidden bg-surface-inset"
+        >
+          {/* 招牌辉光（参考稿）：游戏未铺满时透出的紫色光晕 */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "radial-gradient(circle at 50% 38%, rgba(192,59,255,.16), transparent 62%)" }}
+            aria-hidden
+          />
+          {active ? (
+            <iframe
+              key={reloadKey}
+              ref={iframeRef}
+              src={active.entryUrl}
+              // ★ allow-scripts ONLY — no allow-same-origin (cross-origin isolation, Fatal #2).
+              sandbox="allow-scripts"
+              title={`Game ${gameId}`}
+              className="relative h-full w-full border-0"
+              onLoad={() => {
+                onloadRef.current = true;
+              }}
+            />
+          ) : null}
+
+          {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
+          {status === "loaded" && showStart ? (
+            <StartOverlay
+              controls={active?.controls ?? ""}
+              onStart={() => {
+                iframeRef.current?.focus();
+                setShowStart(false);
+              }}
+            />
+          ) : null}
+          {status === "failed" ? (
+            <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
+          ) : null}
+          {status === "ended" ? (
+            <EndedOverlay score={score} onRestart={handleRestart} />
+          ) : null}
+        </div>
+
+        {/* control bar — 真实控件：重开 / 全屏 / 分享(复制链接)；右侧真实统计（实时分数 + 总游玩） */}
         {active ? (
-          <iframe
-            key={reloadKey}
-            ref={iframeRef}
-            src={active.entryUrl}
-            // ★ allow-scripts ONLY — no allow-same-origin (cross-origin isolation, Fatal #2).
-            sandbox="allow-scripts"
-            title={`Game ${gameId}`}
-            className="h-full w-full border-0"
-            onLoad={() => {
-              onloadRef.current = true;
-            }}
-          />
-        ) : null}
-
-        {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
-        {status === "loaded" && showStart ? (
-          <StartOverlay
-            controls={active?.controls ?? ""}
-            onStart={() => {
-              iframeRef.current?.focus();
-              setShowStart(false);
-            }}
-          />
-        ) : null}
-        {status === "failed" ? (
-          <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
-        ) : null}
-        {status === "ended" ? (
-          <EndedOverlay score={score} onRestart={handleRestart} />
+          <div className="flex items-center gap-2 border-t border-hairline bg-surface px-4 py-3">
+            <button
+              type="button"
+              onClick={handleRestart}
+              disabled={status !== "loaded" && status !== "ended"}
+              title="重开"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 12a9 9 0 1 0 2.6-6.4" />
+                <path d="M3 4v4h4" />
+              </svg>
+              重开
+            </button>
+            <button
+              type="button"
+              onClick={handleFullscreen}
+              title="全屏"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+              全屏
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              title="复制链接"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="18" cy="5" r="2.5" />
+                <circle cx="6" cy="12" r="2.5" />
+                <circle cx="18" cy="19" r="2.5" />
+                <path d="M8.2 10.8 15.8 6.2M8.2 13.2l7.6 4.6" />
+              </svg>
+              {copied ? "已复制" : "分享"}
+            </button>
+            <div className="flex-1" />
+            {status === "loaded" || status === "ended" ? (
+              <span className="font-mono text-[11px] text-ink-muted">Score {score}</span>
+            ) : null}
+            <span className="inline-flex items-center gap-1 font-mono text-[11px] text-ink-muted" title="总游玩次数">
+              <span className="text-ink-faint">▶</span>
+              {playCount}
+            </span>
+          </div>
         ) : null}
       </div>
 
-      {/* control bar — 真实控件（重开 / 全屏）；不放未实现的暂停/音量/收藏/分享/在线 */}
-      {active ? (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleRestart}
-            disabled={status !== "loaded" && status !== "ended"}
-            title="重开"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M3 12a9 9 0 1 0 2.6-6.4" />
-              <path d="M3 4v4h4" />
-            </svg>
-            重开
-          </button>
-          <button
-            type="button"
-            onClick={handleFullscreen}
-            title="全屏"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
-            </svg>
-            全屏
-          </button>
-        </div>
-      ) : null}
-
-      {/* 玩法提示（T1：从 manifest.controls 透传）+ proof: Source badge + isolation note */}
+      {/* 玩法提示（T1：从 manifest.controls 透传）+ proof：Source 徽章(移动补显) + isolation note */}
       {active ? (
         <div className="flex flex-col gap-1.5">
           {active.controls ? (
@@ -278,7 +333,9 @@ export function PlayShell({
               <span>{active.controls}</span>
             </p>
           ) : null}
-          <SourceBadge url={active.entryUrl} />
+          <span className="sm:hidden">
+            <SourceBadge url={active.entryUrl} />
+          </span>
           <p className="font-mono text-[11px] text-ink-faint">
             sandbox=&quot;allow-scripts&quot; · cross-origin · runtime {active.runtime} · v
             {active.versionNumber}

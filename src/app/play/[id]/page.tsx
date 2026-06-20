@@ -11,7 +11,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
   // B2：作者本人玩自己的游戏时给出「生成新版本」入口（→ /create?gameId）。
   const [result, game, session] = await Promise.all([
     resolveActiveVersion(id),
-    prisma.game.findUnique({ where: { id }, select: { authorId: true } }),
+    prisma.game.findUnique({ where: { id }, select: { authorId: true, title: true, playCount: true } }),
     auth(),
   ]);
   const isOwner = !!(session?.user && game && game.authorId === session.user.id);
@@ -19,6 +19,8 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
   return (
     <PlayShell
       gameId={id}
+      title={game?.title ?? "游戏"}
+      playCount={game?.playCount ?? 0}
       active={result.ok ? result.data : null}
       resolveError={
         result.ok ? null : { status: result.status, error: result.error, detail: result.detail ?? null }

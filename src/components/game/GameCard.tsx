@@ -8,6 +8,19 @@ import type { GameCard as GameCardData } from "@/lib/contracts/games";
  * 封面是 MinIO `:9000` 跨域图（img-src 未被站点 CSP 限）。
  * 注：外层不是单一 <a>（标签是独立 link，避免嵌套 anchor）；封面+标题为 Play 链接。
  */
+// 无封面时的程序化渐变占位（参考稿彩色卡片观感）；按 id 确定性取色，异游戏异渐变。
+const COVER_FALLBACKS = [
+  "linear-gradient(150deg,#C03BFF,#3B82F6)",
+  "linear-gradient(160deg,#F6B73C,#FF5C7A)",
+  "linear-gradient(135deg,#5DE2B0,#27E0FF)",
+  "linear-gradient(150deg,#FF3BA7,#C03BFF)",
+];
+function coverFallback(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return COVER_FALLBACKS[Math.abs(h) % COVER_FALLBACKS.length];
+}
+
 export function GameCard({ game }: { game: GameCardData }) {
   const initial = game.author.displayName.trim().charAt(0).toUpperCase() || "?";
   // 确定性格式化（纯字符串切片，避免 toLocaleDateString 的 server/client 水合不一致）
@@ -25,7 +38,7 @@ export function GameCard({ game }: { game: GameCardData }) {
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           ) : (
-            <div className="h-full w-full bg-grad-play opacity-30" aria-hidden />
+            <div className="h-full w-full" style={{ background: coverFallback(game.id) }} aria-hidden />
           )}
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
             ▶ {game.playCount}

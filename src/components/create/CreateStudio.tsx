@@ -373,16 +373,32 @@ export function CreateStudio({
                             <div className="flex flex-col items-center">
                               <span
                                 key={st}
-                                className={`yh-pop grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                                  st === "running" ? "animate-pulse" : ""
-                                }`}
+                                className="yh-pop grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold"
                                 style={{
                                   color: STATE_COLOR[st],
                                   border: `1px solid color-mix(in srgb, ${STATE_COLOR[st]} 55%, transparent)`,
                                   background: `color-mix(in srgb, ${STATE_COLOR[st]} 12%, transparent)`,
+                                  boxShadow:
+                                    st === "running"
+                                      ? "0 0 0 4px rgba(39,224,255,.1), 0 0 14px rgba(39,224,255,.32)"
+                                      : undefined,
                                 }}
                               >
-                                {st === "running" ? "•" : st === "done" ? "✓" : st === "failed" ? "✕" : i + 1}
+                                {st === "running" ? (
+                                  <span
+                                    className="h-3 w-3 animate-spin rounded-full border-2 border-[rgba(39,224,255,.28)]"
+                                    style={{ borderTopColor: "var(--running)" }}
+                                    aria-hidden
+                                  />
+                                ) : st === "done" ? (
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                ) : st === "failed" ? (
+                                  "✕"
+                                ) : (
+                                  i + 1
+                                )}
                               </span>
                               {!last ? (
                                 <span
@@ -403,12 +419,24 @@ export function CreateStudio({
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[13.5px] font-semibold text-ink">{node.label}</span>
-                                <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
-                                  {st}
-                                  {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
-                                  {log && (log.tokensIn != null || log.tokensOut != null)
-                                    ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
-                                    : ""}
+                                <span className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
+                                    {st}
+                                    {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
+                                    {log && (log.tokensIn != null || log.tokensOut != null)
+                                      ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
+                                      : ""}
+                                  </span>
+                                  {log?.outputSummary ? (
+                                    <svg
+                                      width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                                      className="shrink-0 text-ink-faint transition-transform"
+                                      style={{ transform: open ? "rotate(90deg)" : "none" }}
+                                      aria-hidden
+                                    >
+                                      <path d="M9 6l6 6-6 6" />
+                                    </svg>
+                                  ) : null}
                                 </span>
                               </div>
                               <p className="mt-0.5 text-[12px] text-ink-faint">{node.desc}</p>

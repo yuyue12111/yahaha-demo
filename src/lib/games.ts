@@ -58,3 +58,22 @@ export async function listPublishedGames(
 
   return { items, nextCursor: hasMore ? page[page.length - 1].id : undefined };
 }
+
+/**
+ * 已发布游戏的去重标签 + 计数（Home 分类筛选 pill 行的真实数据源，
+ * 替代参考稿里写死的「动作/解谜/街机…」）。按出现次数降序，名称升序兜底。
+ */
+export async function listPublishedTags(limit = 8): Promise<{ tag: string; count: number }[]> {
+  const rows = await prisma.game.findMany({
+    where: { status: "PUBLISHED" },
+    select: { tags: true },
+  });
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, limit);
+}
