@@ -28,6 +28,11 @@ function formatPlays(n: number): string {
   return String(n);
 }
 
+/** 发布时间 → 确定性 YYYY-MM-DD（无 locale 歧义，SSR 稳定）。 */
+function formatPublished(iso: string | null): string {
+  return iso ? iso.slice(0, 10) : "";
+}
+
 export function GameCard({
   game,
   showBookmark = false,
@@ -71,6 +76,11 @@ export function GameCard({
         </h3>
       </Link>
 
+      {/* 简介（一行截断）—— 验收字段「简介」上卡面；完整版在详情页。 */}
+      {game.summary ? (
+        <p className="mt-1 line-clamp-1 text-[12px] leading-snug text-ink-muted/85">{game.summary}</p>
+      ) : null}
+
       <div className="mt-1.5 flex items-center gap-1.5">
         <span
           className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-medium text-ink-muted"
@@ -79,7 +89,33 @@ export function GameCard({
           {initial}
         </span>
         <span className="truncate text-[13px] text-ink-muted">{game.author.displayName}</span>
+        {/* 发布时间 —— 验收字段「发布时间」上卡面。 */}
+        {game.publishedAt ? (
+          <time
+            dateTime={game.publishedAt}
+            className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-ink-muted/70"
+          >
+            {formatPublished(game.publishedAt)}
+          </time>
+        ) : null}
       </div>
+
+      {/* 标签（最多 2 枚）—— 验收字段「标签」上卡面；全部标签在详情页可点筛选。 */}
+      {game.tags.length ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {game.tags.slice(0, 2).map((t) => (
+            <span
+              key={t}
+              className="rounded-pill bg-surface-2 px-2 py-0.5 text-[10px] text-ink-muted"
+            >
+              {t}
+            </span>
+          ))}
+          {game.tags.length > 2 ? (
+            <span className="text-[10px] text-ink-muted/60">+{game.tags.length - 2}</span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
