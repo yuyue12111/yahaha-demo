@@ -36,7 +36,9 @@
 
 - `MAX_UPLOAD_BYTES`（上传）、`MAX_BUNDLE_BYTES`（产物体积上限，VALIDATOR 拦截）、`GENERATION_TIMEOUT_MS`（任务看护）、`MAX_AGENT_RETRIES`（节点重试）。
 - BullMQ 并发上限防止 worker 过载；任务超时置 `FAILED` 防卡 `RUNNING`。
-- 〔设计/未实现〕按用户的生成速率限额、成本统计（token 计入 `AgentLog`，可聚合）。
+- 〔已实现〕**per-user 速率限额**（`src/lib/rate-limit.ts`，Redis 固定窗口）：新建生成任务 `POST /api/tasks` 限 `RATE_LIMIT_TASKS`/`RATE_LIMIT_WINDOW_SEC`，超额 **429 `RATE_LIMITED` + `Retry-After`**；公开埋点 `POST /api/play-events` 按 (session uid | client IP) 限 `RATE_LIMIT_PLAY_EVENTS` 防刷 `playCount`。Redis 不可用时 **fail-open**（限额是防滥用增强，绝不拖垮正常用户）。
+- 〔已实现〕**成本统计**：6 节点 token 计入 `AgentLog`（确定性节点恒 0），Create run-timeline 聚合并展示每节点 + 总量（mock 估算）。
+- 〔设计/未实现〕内容审核（content moderation）为加分项，仅设计。
 
 ## 6. 鉴权与越权
 
@@ -57,4 +59,7 @@
 | 上传白名单 + 限额 | 已实现 |
 | 密钥仅服务端 + `.env.example` | 已实现 |
 | 任务超时/重试 | 已实现 |
-| Prompt Injection 深防御 / 内容审核 / 成本限额 | 设计（已知问题） |
+| 失效会话存在性再校验（`requireUser` → 401 非 500） | 已实现 |
+| per-user 速率限额（任务 + play-events，Redis 固定窗口，fail-open） | 已实现 |
+| 成本统计（6 节点 token 聚合 + run-timeline 展示） | 已实现 |
+| Prompt Injection 深防御 / 内容审核 | 设计（已知问题） |
