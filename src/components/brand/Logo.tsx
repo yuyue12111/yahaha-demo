@@ -134,14 +134,87 @@ export function YForkLogo({ size = 28, float = false }: { size?: number; float?:
   );
 }
 
-/** logo + "Yahaha" 字标（字重 800，沿用站点字体）。 */
+// ── 像素字标 "YAHAHA"（参考稿 Pixel Logo 的 Silkscreen lockup）：canvas 5×7 位模渲染，
+//    与像素 logo 同一套技术（自带、离线安全、不引入字体/联网，保红线⑤）。YAHAHA 只需 Y/A/H 三字模。
+const GLYPHS: Record<string, string[]> = {
+  Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
+  A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+};
+const WORD = "YAHAHA";
+
+/**
+ * 像素字标。`height` 可传 px 数字（侧栏/Brand）或 CSS 串如 "0.78em"（随标题字号缩放，用于 Create 标题内联）。
+ * 内部固定高分辨率绘制，CSS 缩放 + image-rendering:pixelated 保持锐利。
+ */
+export function PixelWordmark({
+  height = 18,
+  color = "#F4F1FA",
+  glow = true,
+  className = "",
+}: {
+  height?: number | string;
+  color?: string;
+  glow?: boolean;
+  className?: string;
+}) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const rows = 7,
+      colsPer = 5,
+      gap = 1,
+      cell = 8; // 内部分辨率（device px/格）
+    const totalCols = WORD.length * colsPer + (WORD.length - 1) * gap;
+    c.width = totalCols * cell;
+    c.height = rows * cell;
+    ctx.clearRect(0, 0, c.width, c.height);
+    const draw = (fill: string, alpha: number) => {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = fill;
+      let colOff = 0;
+      for (const ch of WORD) {
+        const g = GLYPHS[ch];
+        for (let r = 0; r < rows; r++)
+          for (let k = 0; k < colsPer; k++) {
+            if (g[r][k] === "1") {
+              const pad = Math.max(0.5, cell * 0.08);
+              ctx.fillRect((colOff + k) * cell + pad, r * cell + pad, cell - 2 * pad, cell - 2 * pad);
+            }
+          }
+        colOff += colsPer + gap;
+      }
+      ctx.globalAlpha = 1;
+    };
+    if (glow) {
+      ctx.save();
+      ctx.filter = "blur(" + cell * 0.5 + "px)";
+      draw(color, 0.45);
+      ctx.restore();
+    }
+    draw(color, 1);
+  }, [color, glow]);
+  const h = typeof height === "number" ? `${height}px` : height;
+  return (
+    <canvas
+      ref={ref}
+      role="img"
+      aria-label="Yahaha"
+      className={className}
+      style={{ height: h, width: "auto", display: "block", imageRendering: "pixelated" }}
+    />
+  );
+}
+
+/** logo + 像素 "YAHAHA" 字标。 */
 export function Brand({ size = 28, float = false }: { size?: number; float?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <YForkLogo size={size} float={float} />
-      <span className="font-extrabold tracking-tight" style={{ fontSize: Math.round(size * 0.6) }}>
-        Yahaha
-      </span>
+      <PixelWordmark height={Math.round(size * 0.5)} />
     </span>
   );
 }
