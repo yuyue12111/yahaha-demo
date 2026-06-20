@@ -1,12 +1,13 @@
 # 10 · 设计系统契约（视觉基调）
 
 > 平台艺术风格的**权威源**。基调 = **方向 A 霓虹街机为底 + 方向 B 的克制**（更大圆角、细描边、更多留白）。
-> 参考 Astrocade：暗色 plum 底、内容为王、双招牌渐变（Play=洋红紫 / Create=青蓝）、星形品牌符号、胶囊主操作。
+> 参考 Astrocade：暗色 plum 底、内容为王、双招牌渐变（Play=洋红紫 / Create=青蓝）、**Y-fork 品牌符号**、胶囊主操作。
+> （品牌符号 2026-06-20 由「通用五角星」更新为 **Y-fork**：两臂双渐变=两条旅程，汇成白色主干=首字母 Y / 双路合一。见 Claude Design handoff。）
 > 设计**不计分**，定位是让 demo 专业且有「参考 Astrocade」那味儿；落地走 Tailwind theme + shadcn/ui，**单暗色主题**。
 
 ## 设计原则
 - 暗底 + 彩色封面跳出，chrome 极简克制（借 B）。
-- **双渐变映射双旅程**：洋红→紫 = 玩/消费（Play、品牌星）；青→蓝 = 创作/AI（Create、Inspire、发送）。
+- **双渐变映射双旅程**：洋红→紫 = 玩/消费（Play、品牌标 Y 左臂）；青→蓝 = 创作/AI（Create、Inspire、发送、品牌标 Y 右臂）。
 - 胶囊用于主操作（A 的能量）；卡片/次级控件用大圆角 + 细描边（B 的克制）。
 - 把 **Play 的「Source: 远端 URL」徽章**当作一等公民设计进运行时外壳（rubric 锚点）。
 
@@ -65,7 +66,7 @@
 | Input（Create 聊天） | `--surface-inset` 底，`r-lg`，占位 `--text-faint`，发送按钮 = `--grad-create` 圆形 |
 | State pill | 见状态色；圆点 + 文案（loaded/pending/running/failed/ended） |
 | **Source 徽章（Play）** | `--surface-inset` + `--border` 1px，mono 11，字 `--text-muted`，云图标 `#27E0FF`；内容 `Source: <远端 URL>` |
-| 星形 logo | squircle（圆角≈30%）`--grad-play` + 白色星图标；"Yahaha" 字重 800 |
+| Y-fork logo | squircle（圆角≈30%）plum 底（`linear-gradient(160deg,#241C3A,#15111E)` + `--border-brand`）+ Y 字标：左臂 `--grad-play`、右臂 `--grad-create`、主干白 `#F4F1FA`；"Yahaha" 字重 800。组件 `components/brand/Logo.tsx`，渐变 def 由 `<BrandDefs/>` 全站提供 |
 | Modal | `--surface` 底，`r-xl`，scrim `rgba(0,0,0,.55)`，可选轻阴影 `0 12px 40px rgba(0,0,0,.5)` |
 
 ## 落地映射（实现期照此接）
