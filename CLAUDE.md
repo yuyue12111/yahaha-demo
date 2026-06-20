@@ -15,8 +15,11 @@
 ## 1. 已锁定决策（不要再推翻）
 
 - **技术栈 = Hybrid-A**：全 TypeScript 单体（Next.js 全栈 + Node worker，共享 `src/lib`），
-  借鉴三处：① Validator 节点 headless 截图当封面（可选/可砍）② `ingest` 节点用 vision 让上传**真影响生成**
+  借鉴三处：① Validator 节点 headless 截图当封面（可选/可砍）② `ingest` 节点用 vision 让上传影响生成
   ③ 每个 Agent 节点做成可重试 durable step + Create UI run-timeline 视图。
+  - **②的诚实口径（实现注，2026-06-20）**：当前上传**仅经文件名/MIME 类型**影响生成（mock 据其做种 → 异上传异产物，红线③成立）；
+    `vision({imageUrl})` 的真读像素接线已在（`src/lib/model/types.ts` + `openai.ts` 的 `image_url`），但 `ingest.ts` 当前未把素材 URL 喂进去 →
+    **「让真实模型读上传像素」DEFERRED 至 post-MVP**（接真 GPT-5.5 时在 ingest 传 imageUrl 即生效；远端模型需可达的图 URL/base64）。
 - **交付目标**：本地 `docker compose up` 可复现为**唯一**交付；公网 URL 不在范围（仅大幅领先时作可选 stretch）。
 - 详见 `docs/01-architecture.md` 的技术栈表。
 - **视觉基调**：方向 A 霓虹街机为底 + B 的克制（暗色 plum、双渐变 Play/Create、星形 logo）；token 见 `docs/10-design-system.md`。

@@ -74,6 +74,7 @@ docker compose up --build
 
 **Mock / 设计占位**
 - 默认 `mock` 模型（确定性、输入敏感）；真实 GPT-5.5 走同一 `ModelClient` seam，填 `MODEL_*` 即切。
+- **多模态上传**：当前上传**仅经文件名 / MIME 类型**影响生成（mock 据其做种 → 异上传异产物，红线③成立）；`vision({imageUrl})` 真读像素的接线已在（`model/types.ts` + `openai.ts`），但 `ingest.ts` 喂像素 URL **deferred**（接真模型时补，见 `docs/04` INGEST 行）。
 - OAuth：保留 `Account` 数据模型 + 流程设计（`docs/07`），缺省关闭，未真接 Google/GitHub。
 - 封面走调色板 SVG 缩略图（降级阶梯）；Validator headless 截图为可选未启。
 
