@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { YForkLogo } from "@/components/brand/Logo";
+import { YForkLogo, PixelWordmark } from "@/components/brand/Logo";
 import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
 import { StatusChip } from "@/components/ui/StatusChip";
 import type { AgentLogDTO, AgentName, TaskStatus, TaskDoneData } from "@/lib/contracts/tasks";
@@ -312,26 +312,20 @@ export function CreateStudio({
         </ul>
       ) : null}
 
-      {/* 渐变描边 ring：聚焦时点亮（品牌青→紫→蓝），hero 态加大投影 */}
+      {/* moonshot 式：默认暗（细描边、无 glow），指针悬停 / 聚焦才点亮发光（柔和霓虹）。去掉常亮渐变 ring，更干净。 */}
       <div
         className={
-          "rounded-2xl bg-gradient-to-r p-px transition-all " +
-          "from-[rgba(39,224,255,.42)] via-[rgba(192,59,255,.34)] to-[rgba(59,130,246,.42)] " +
-          "focus-within:from-brand-cyan focus-within:via-brand-purple focus-within:to-brand-blue " +
-          (hero ? "shadow-[0_34px_90px_-34px_rgba(124,92,255,.55)]" : "")
+          "group rounded-2xl border border-hairline bg-[#0d0a16] transition-[border-color,box-shadow] duration-300 " +
+          "hover:border-[rgba(124,92,255,.5)] hover:shadow-[0_0_0_1px_rgba(124,92,255,.16),0_24px_70px_-22px_rgba(124,92,255,.6)] " +
+          "focus-within:border-[rgba(39,224,255,.55)] focus-within:shadow-[0_0_0_1px_rgba(39,224,255,.22),0_24px_72px_-20px_rgba(39,224,255,.55)]"
         }
       >
-        <div
-          className={
-            "flex items-end gap-2.5 rounded-[15px] bg-[#0e0b18]/95 " +
-            (hero ? "p-2.5 pl-3" : "p-2 pl-2.5")
-          }
-        >
+        <div className={"flex items-end gap-2.5 " + (hero ? "p-3.5 pl-4" : "p-2 pl-2.5")}>
           <label
             title="附素材"
             className={
               "grid shrink-0 cursor-pointer place-items-center rounded-md border border-hairline leading-none text-ink-muted transition-colors hover:border-hairline-brand hover:text-ink " +
-              (hero ? "h-10 w-10 text-[20px]" : "h-9 w-9 text-[18px]")
+              (hero ? "h-11 w-11 text-[22px]" : "h-9 w-9 text-[18px]")
             }
           >
             <input
@@ -360,8 +354,8 @@ export function CreateStudio({
             }
             rows={1}
             className={
-              "flex-1 resize-none self-center bg-transparent text-ink outline-none placeholder:text-ink-faint " +
-              (hero ? "max-h-40 min-h-[44px] py-2 text-[15px]" : "max-h-32 min-h-[36px] py-1.5 text-sm")
+              "flex-1 resize-none self-center bg-transparent text-ink outline-none placeholder:text-ink-faint focus-visible:shadow-none " +
+              (hero ? "max-h-44 min-h-[56px] py-2.5 text-base" : "max-h-32 min-h-[36px] py-1.5 text-sm")
             }
           />
           <Button
@@ -586,9 +580,9 @@ export function CreateStudio({
             <div className="mx-auto mb-6 w-fit">
               <YForkLogo size={62} float />
             </div>
-            <h1 className="text-[clamp(30px,5vw,52px)] font-extrabold leading-[1.05] tracking-tight text-ink">
-              把点子交给{" "}
-              <span className="bg-grad-create bg-clip-text text-transparent">Yahaha</span>
+            <h1 className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[clamp(30px,5vw,52px)] font-extrabold leading-[1.05] tracking-tight text-ink">
+              <span>把点子交给</span>
+              <PixelWordmark height="0.74em" />
             </h1>
             <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-relaxed text-ink-muted">
               从一句话，到一个可玩的世界 —— 六个 Agent 接力，几十秒生成、即刻游玩。

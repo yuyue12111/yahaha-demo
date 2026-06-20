@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { YForkLogo } from "@/components/brand/Logo";
+import { YForkLogo, PixelWordmark } from "@/components/brand/Logo";
 
 /**
  * 侧栏（参考稿 Astrocade）：醒目 Y-fork 品牌 + 大「创作」主胶囊 + 大号图标导航，
@@ -92,13 +92,10 @@ export function Sidebar({ initialCollapsed = false }: { initialCollapsed?: boole
       }}
     >
       {/* 品牌 */}
-      <Link href="/" className="flex h-11 items-center gap-2.5 px-1" title="Yahaha">
+      <Link href="/" className="flex h-11 items-center gap-2.5 px-1" title="Yahaha" data-dock-target>
         <YForkLogo size={40} />
-        <span
-          className="text-[22px] font-extrabold tracking-tight text-ink transition-opacity duration-200"
-          style={{ opacity: collapsed ? 0 : 1 }}
-        >
-          Yahaha
+        <span className="transition-opacity duration-200" style={{ opacity: collapsed ? 0 : 1 }}>
+          <PixelWordmark height={19} />
         </span>
       </Link>
 

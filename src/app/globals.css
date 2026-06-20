@@ -83,6 +83,12 @@
   }
 }
 
+/* 入场动画每会话只播一次：已看过的会话里，<head> 内联脚本在首帧前给 <html> 加 .intro-seen，
+   CSS 立刻隐藏覆盖层 → 后续导航（含搜索）不再闪黑场/重播（React 端也会跳过动画）。 */
+html.intro-seen #yahaha-intro {
+  display: none !important;
+}
+
 /* CR1：run-timeline 动效 —— 节点状态切换弹入 + running 进度 shimmer */
 @keyframes yh-pop {
   0% { transform: scale(0.55); opacity: 0.25; }
