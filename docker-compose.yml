@@ -66,7 +66,8 @@ services:
       S3_BUCKET: yahaha
     entrypoint: ["/bin/sh", "/scripts/minio-init.sh"]
 
-  # 一次性：迁移 + 插入预制游戏（builder 镜像含 prisma CLI + tsx）。web gated 其后。
+  # 一次性：迁移 + 插预制游戏 + **真跑一次 Create 流水线**产第 3 个游戏并发布（builder 镜像含 prisma CLI + tsx）。
+  # 故 seed 需 MinIO 写入（PACKAGER putObject）+ redis（runGeneration 发 SSE 事件，无订阅者也无害）。web gated 其后。
   seed:
     build:
       context: .
@@ -75,12 +76,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://yahaha:yahaha@db:5432/yahaha?schema=public
-      S3_PUBLIC_ENDPOINT: http://localhost:9000 # coverUrl/manifestUrl 必须浏览器可达
+      # dual endpoint：PACKAGER putObject 走内网 minio:9000；coverUrl/manifestUrl 烧录 localhost:9000（浏览器可达）
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
       S3_BUCKET: yahaha
+      S3_FORCE_PATH_STYLE: "true"
+      REDIS_URL: redis://redis:6379
+      MODEL_PROVIDER: mock # seed 恒用确定性 mock → 可复现、离线（不受 .env 的 MODEL_PROVIDER 影响）
     command: ["sh", "-c", "pnpm prisma migrate deploy && pnpm tsx prisma/seed.ts"]
 
   # 独立 worker 进程：消费 BullMQ 队列跑 6 节点 Agent 流水线（红线④）。

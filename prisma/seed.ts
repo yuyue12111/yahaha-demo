@@ -1,13 +1,15 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { prisma } from "../src/lib/db";
+import { runGeneration } from "../src/lib/agents/runner";
+import { publishGameVersion } from "../src/lib/publish";
 
 /**
- * 幂等 seed：作者 → 2 预制游戏 → 2 版本 → 设 activeVersionId。
- * 在 compose `seed` 一次性服务里跑（`tsx prisma/seed.ts`）；bundle 已由 minio-init 上传到 MinIO。
- * coverUrl/manifestUrl 用 PUBLIC 端点（浏览器可达）。
+ * 幂等 seed（compose 一次性 `seed` 服务，`tsx prisma/seed.ts`）：
+ *  1) 作者 + CREDENTIALS account；
+ *  2) 2 个手作预制游戏（bundle 由 minio-init 上传）；
+ *  3) **真跑一次 Create 流水线**（确定性 mock）产出第 3 个游戏并发布 → 满足「≥3 游戏，≥1 来自 Create」（docs/00:62）。
+ * 共用 app 的 `prisma`/`runGeneration`/`publishGameVersion`，与运行期同一套代码路径（非另写假数据）。
  */
-const prisma = new PrismaClient();
-
 const S3_PUBLIC = (process.env.S3_PUBLIC_ENDPOINT || "http://localhost:9000").replace(/\/+$/, "");
 const BUCKET = process.env.S3_BUCKET || "yahaha";
 const publicUrl = (key: string) => `${S3_PUBLIC}/${BUCKET}/${key.replace(/^\/+/, "")}`;
@@ -26,6 +28,45 @@ const SEED_GAMES = [
     tags: ["arcade", "catch", "neon"],
   },
 ];
+
+const SEED_CREATE_PROMPT = "一个霓虹太空主题的躲避小游戏，节奏随时间加快，适合快速上手";
+
+/** 真跑一次生成流水线 + 发布 → 一个「来自 Create 流程」的已发布游戏。幂等：已有则跳过。 */
+async function seedCreateGame(authorId: string): Promise<void> {
+  const prior = await prisma.generationTask.findFirst({
+    where: { prompt: SEED_CREATE_PROMPT, status: "SUCCEEDED", gameId: { not: null } },
+    select: { gameId: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (prior?.gameId) {
+    const g = await prisma.game.findUnique({ where: { id: prior.gameId }, select: { status: true } });
+    if (g?.status === "PUBLISHED") {
+      console.log("[seed] Create game already generated + published — skip");
+      return;
+    }
+  }
+
+  console.log("[seed] running the REAL Create pipeline once (deterministic mock)…");
+  const task = await prisma.generationTask.create({
+    data: { userId: authorId, prompt: SEED_CREATE_PROMPT, inputAssetIds: [], status: "PENDING" },
+    select: { id: true },
+  });
+  await runGeneration(task.id); // 6 节点 → 真 bundle 上传 MinIO + Game(DRAFT)+Version(PREVIEW)
+  const done = await prisma.generationTask.findUnique({
+    where: { id: task.id },
+    select: { status: true, gameId: true, resultVersionId: true, error: true },
+  });
+  if (done?.status !== "SUCCEEDED" || !done.gameId || !done.resultVersionId) {
+    throw new Error(`Create pipeline failed: ${done?.error ?? "unknown"}`);
+  }
+  const pub = await publishGameVersion({
+    gameId: done.gameId,
+    versionId: done.resultVersionId,
+    userId: authorId,
+  });
+  if (!pub.ok) throw new Error(`publish failed: ${pub.error}`); // 守卫：发布失败硬失败，防 <3 已发布回归
+  console.log(`[seed] Create game generated + published: ${done.gameId}`);
+}
 
 async function main() {
   const passwordHash = await bcrypt.hash("yahaha-demo", 10);
@@ -75,13 +116,19 @@ async function main() {
     await prisma.game.update({ where: { id: g.id }, data: { activeVersionId: version.id } });
   }
 
-  console.log(`[seed] author + ${SEED_GAMES.length} games upserted`);
+  await seedCreateGame(author.id);
+
+  const published = await prisma.game.count({ where: { status: "PUBLISHED" } });
+  console.log(`[seed] done — ${SEED_GAMES.length} hand-authored + 1 Create = ${published} published games`);
 }
 
 main()
-  .then(() => prisma.$disconnect())
+  .then(async () => {
+    await prisma.$disconnect();
+    process.exit(0); // 显式退出：runGeneration 的 redis 发布连接会挂住事件循环
+  })
   .catch(async (e) => {
     console.error("[seed] failed:", e);
-    await prisma.$disconnect();
+    await prisma.$disconnect().catch(() => {});
     process.exit(1);
   });
