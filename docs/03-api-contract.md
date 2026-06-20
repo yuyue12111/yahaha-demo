@@ -28,11 +28,12 @@
 | 方法 | 路径 | 鉴权 | 说明 |
 |------|------|:----:|------|
 | GET | `/api/games` | 否 | 查询：`?status=published&search=&tag=&sort=newest\|popular&cursor=` → `{ items: GameCard[], nextCursor? }` |
-| GET | `/api/games/:id` | 否 | `{ game, author, activeVersion, stats:{likes,favorites,playCount}, liked?, favorited? }` |
+| GET | `/api/games/:id` | 否 | `{ game, author, activeVersion, stats:{likes,favorites,playCount}, liked?, favorited? }` ·（**已实现**；`liked/favorited` 待 like/favorite 落地再返回，当前省略） |
 | GET | `/api/games/:id/active-version` | 否 | **Play 用**：`{ gameId, versionNumber, runtime, manifestUrl, entryUrl }`（均为 MinIO 源 URL；`entryUrl` = 前缀+`manifest.entry` 服务端绝对化）· 404 未找到 · 502 `MANIFEST_UNAVAILABLE`（清单不可读）。注：DB 落地后补 `versionId` |
 | POST | `/api/games/:id/publish` | 是(作者) | body `{ versionId }` → 置 `status=PUBLISHED`、`activeVersionId`、`publishedAt`；version 置 `PUBLISHED` |
-| POST | `/api/games/:id/like` / DELETE 同路径 | 是 | 点赞/取消（加分） |
-| POST | `/api/games/:id/favorite` / DELETE 同路径 | 是 | 收藏/取消（加分） |
+| POST | `/api/games/:id/like` / DELETE 同路径 | 是 | 点赞/取消（加分，**写入 deferred 2026-06-20**；统计读出已在详情页） |
+| POST | `/api/games/:id/favorite` / DELETE 同路径 | 是 | 收藏/取消（加分，**写入 deferred 2026-06-20**） |
+| POST | `/api/play-events` | 否 | **已实现**：Play 回写 `{ gameId, versionId?, type:LOAD\|START\|END\|ERROR, score?, durationMs? }`；`type=LOAD` → `playCount++`（START 未发，deferred） |
 
 `GameCard` = `{ id, title, summary, coverUrl, tags, author:{id,displayName}, publishedAt, playCount }`。
 
