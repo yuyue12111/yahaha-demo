@@ -47,6 +47,9 @@ export async function runValidator(
   });
   return {
     output,
+    // 静态校验（不调模型）→ token 成本恒为 0（B3：6 节点全量记 token）。
+    tokensIn: 0,
+    tokensOut: 0,
     inputSummary: `${coder.files.length} 文件 / ${bundleBytes}B`,
     outputSummary: `契约存在性 OK · ≤${env.MAX_BUNDLE_BYTES}B · cover=${output.coverPath ?? "none"}`,
   };

@@ -142,6 +142,9 @@ export async function runPackager(
   });
   return {
     output,
+    // 上传打包（不调模型）→ token 成本恒为 0（B3：6 节点全量记 token）。
+    tokensIn: 0,
+    tokensOut: 0,
     inputSummary: `${coder.files.length} 文件 → ${prefix}/`,
     outputSummary: `Version#${versionNumber}(PREVIEW) · ${manifestFiles.length} 文件上传 · bundleSha ${bundleSha256.slice(0, 12)}…`,
   };

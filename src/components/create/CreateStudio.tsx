@@ -213,6 +213,14 @@ export function CreateStudio({
   const failed = taskStatus === "FAILED";
   const succeeded = taskStatus === "SUCCEEDED";
 
+  // B3：跨 6 节点聚合生成成本（mock 估算；确定性节点贡献 0）。
+  const logVals = Object.values(logsByAgent);
+  const hasTokens = logVals.some((l) => l?.tokensIn != null || l?.tokensOut != null);
+  const tokenTotal = logVals.reduce(
+    (acc, l) => ({ in: acc.in + (l?.tokensIn ?? 0), out: acc.out + (l?.tokensOut ?? 0) }),
+    { in: 0, out: 0 },
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* 左：创意输入 */}
@@ -315,6 +323,14 @@ export function CreateStudio({
               <span className="text-[12px] text-ink-faint">尚未开始</span>
             )}
           </div>
+          {hasTokens ? (
+            <div className="mb-2 flex items-center justify-between rounded-md border border-hairline bg-surface-inset px-2.5 py-1.5 font-mono text-[11px] text-ink-muted">
+              <span>Σ 生成成本（mock 估算）</span>
+              <span>
+                {tokenTotal.in} in · {tokenTotal.out} out · {tokenTotal.in + tokenTotal.out} tok
+              </span>
+            </div>
+          ) : null}
           <ol className="flex flex-col gap-2">
             {NODES.map((node, i) => {
               const st = nodeState(node.name);
@@ -339,6 +355,9 @@ export function CreateStudio({
                       <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
                         {st}
                         {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
+                        {log && (log.tokensIn != null || log.tokensOut != null)
+                          ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
+                          : ""}
                       </span>
                     </div>
                     <p className="text-[11px] text-ink-faint">{node.desc}</p>
