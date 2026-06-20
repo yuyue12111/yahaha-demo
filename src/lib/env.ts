@@ -44,6 +44,10 @@ const EnvSchema = z.object({
   MAX_AGENT_RETRIES: intDefault(2),
   MAX_BUNDLE_BYTES: intDefault(2_097_152), // 2MB
   WORKER_CONCURRENCY: intDefault(2),
+
+  // ---- per-user 速率限额（docs/07 §5）：固定窗口，Redis 计数 ----
+  RATE_LIMIT_TASKS: intDefault(10), // 每窗口最多新建任务数
+  RATE_LIMIT_WINDOW_SEC: intDefault(60),
 });
 
 export const env = EnvSchema.parse({
@@ -67,4 +71,7 @@ export const env = EnvSchema.parse({
   MAX_AGENT_RETRIES: process.env.MAX_AGENT_RETRIES,
   MAX_BUNDLE_BYTES: process.env.MAX_BUNDLE_BYTES,
   WORKER_CONCURRENCY: process.env.WORKER_CONCURRENCY,
+
+  RATE_LIMIT_TASKS: process.env.RATE_LIMIT_TASKS,
+  RATE_LIMIT_WINDOW_SEC: process.env.RATE_LIMIT_WINDOW_SEC,
 });

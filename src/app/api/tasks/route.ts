@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { CreateTaskRequest, CreateTaskResponse } from "@/lib/contracts/tasks";
 import { enqueueGeneration } from "@/lib/queue";
+import { rateLimitCreateTask } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,17 @@ export async function POST(req: Request) {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const userId = gate.user.id;
+
+  // B4：per-user 任务频率限额（docs/07 §5）。fail-open（Redis 挂则放行）。
+  const rl = await rateLimitCreateTask(userId);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      errorEnvelope("RATE_LIMITED", `请求过于频繁，请 ${rl.retryAfterSec}s 后再试`, {
+        retryAfterSec: rl.retryAfterSec,
+      }),
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
 
   let body: unknown;
   try {
