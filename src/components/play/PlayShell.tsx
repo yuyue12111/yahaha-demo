@@ -17,10 +17,13 @@ export function PlayShell({
   gameId,
   active,
   resolveError,
+  regenHref = null,
 }: {
   gameId: string;
   active: ActiveVersionResponse | null;
   resolveError: ResolveErrorInfo | null;
+  /** 非空（作者本人）→ 显示「生成新版本」入口（B2）。 */
+  regenHref?: string | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -165,6 +168,14 @@ export function PlayShell({
           <span className="text-[15px] font-extrabold tracking-tight">Yahaha</span>
         </Link>
         <div className="flex items-center gap-3">
+          {regenHref ? (
+            <Link
+              href={regenHref}
+              className="rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              ＋ 新版本
+            </Link>
+          ) : null}
           {status === "loaded" || status === "ended" ? (
             <span className="font-mono text-[12px] text-ink-muted">Score {score}</span>
           ) : null}

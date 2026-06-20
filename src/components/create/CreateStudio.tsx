@@ -25,7 +25,12 @@ const STATE_COLOR: Record<NodeState, string> = {
   failed: "var(--danger)",
 };
 
-export function CreateStudio() {
+export function CreateStudio({
+  regen = null,
+}: {
+  /** 非空 → 在已有游戏上生成新版本（提交带 gameId → packager 产 versionNumber+1）。 */
+  regen?: { gameId: string; title: string } | null;
+} = {}) {
   const [prompt, setPrompt] = useState("");
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -165,7 +170,11 @@ export function CreateStudio() {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), assetIds: uploads.map((u) => u.assetId) }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          assetIds: uploads.map((u) => u.assetId),
+          ...(regen ? { gameId: regen.gameId } : {}),
+        }),
       });
       if (res.status !== 202) {
         const e = await res.json().catch(() => null);
@@ -178,7 +187,7 @@ export function CreateStudio() {
       setSubmitError(e instanceof Error ? e.message : String(e));
       setTaskStatus("FAILED");
     }
-  }, [prompt, uploads, busy, openStream]);
+  }, [prompt, uploads, busy, openStream, regen]);
 
   const retry = useCallback(async () => {
     if (!taskId) return;
@@ -214,6 +223,13 @@ export function CreateStudio() {
             描述你的游戏创意，可选附上参考图。提交后由独立 worker 异步跑 6 节点生成流水线。
           </p>
         </div>
+
+        {regen ? (
+          <div className="rounded-lg border border-hairline-brand bg-surface-inset px-3 py-2 text-[13px] text-ink-muted">
+            在《<span className="font-medium text-ink">{regen.title}</span>》上生成新版本
+            —— 产物记为 <span className="font-mono">v+1</span>，生成后可发布切换为该游戏的 active 版本。
+          </div>
+        ) : null}
 
         <div className="rounded-lg border border-hairline bg-surface-inset p-3">
           <textarea
