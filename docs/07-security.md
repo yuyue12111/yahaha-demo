@@ -41,6 +41,7 @@
 ## 6. 鉴权与越权
 
 - `/create` 等受保护路由经 middleware + 服务端 session 校验。
+- 需登录的 Node API 路由统一经 `requireUser()`（`src/lib/require-user.ts`）：`auth()` 解码 JWT 后**再核对 `uid` 仍在 `User` 表**。签名仍合法但已失效的会话（库重置 / 删号 / 旧 cookie）一律 **401「请重新登录」**，避免后续写库撞外键（Prisma P2003）落成未捕获 500。Prisma 绝不上 Edge —— 该校验只在 Node 路由，middleware 仍用纯 JWT 解码。
 - 资源操作校验归属：发布/重试/删除校验 `authorId`/`userId`，越权返回 403。
 
 ## OAuth 安全（设计）

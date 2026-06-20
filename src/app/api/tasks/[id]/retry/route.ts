@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { CreateTaskResponse } from "@/lib/contracts/tasks";
@@ -13,10 +13,8 @@ export const dynamic = "force-dynamic";
  * 清旧 AgentLog 让步骤流干净重跑；复用同 gameId（若有）；再入队，立即 202。仅本人、仅 FAILED 可重试。
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json(errorEnvelope("UNAUTHORIZED", "未登录"), { status: 401 });
-  }
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
   const { id } = await params;
   const task = await prisma.generationTask.findUnique({
     where: { id },
@@ -25,7 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!task) {
     return NextResponse.json(errorEnvelope("NOT_FOUND", "任务不存在"), { status: 404 });
   }
-  if (task.userId !== session.user.id) {
+  if (task.userId !== gate.user.id) {
     return NextResponse.json(errorEnvelope("FORBIDDEN", "非本人任务"), { status: 403 });
   }
   if (task.status !== "FAILED") {

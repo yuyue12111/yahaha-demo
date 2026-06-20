@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { CreateTaskRequest, CreateTaskResponse } from "@/lib/contracts/tasks";
@@ -14,10 +14,9 @@ export const dynamic = "force-dynamic";
  * 实际生成由独立 worker 进程异步消费（src/worker/index.ts）。
  */
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json(errorEnvelope("UNAUTHORIZED", "未登录"), { status: 401 });
-  }
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const userId = gate.user.id;
 
   let body: unknown;
   try {
@@ -39,7 +38,7 @@ export async function POST(req: Request) {
   if (gameId) {
     const g = await prisma.game.findUnique({ where: { id: gameId }, select: { authorId: true } });
     if (!g) return NextResponse.json(errorEnvelope("NOT_FOUND", "目标游戏不存在"), { status: 404 });
-    if (g.authorId !== session.user.id) {
+    if (g.authorId !== userId) {
       return NextResponse.json(errorEnvelope("FORBIDDEN", "非作者，禁止操作"), { status: 403 });
     }
   }
@@ -48,7 +47,7 @@ export async function POST(req: Request) {
   if (assetIds && assetIds.length > 0) {
     const ids = [...new Set(assetIds)];
     const owned = await prisma.asset.count({
-      where: { id: { in: ids }, ownerId: session.user.id },
+      where: { id: { in: ids }, ownerId: userId },
     });
     if (owned !== ids.length) {
       return NextResponse.json(
@@ -60,7 +59,7 @@ export async function POST(req: Request) {
 
   const task = await prisma.generationTask.create({
     data: {
-      userId: session.user.id,
+      userId,
       prompt,
       inputAssetIds: assetIds ?? [],
       gameId: gameId ?? null,
