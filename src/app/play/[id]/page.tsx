@@ -24,6 +24,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
         result.ok ? null : { status: result.status, error: result.error, detail: result.detail ?? null }
       }
       regenHref={isOwner ? `/create?gameId=${id}` : null}
+      detailHref={`/games/${id}`}
     />
   );
 }

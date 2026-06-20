@@ -18,12 +18,15 @@ export function PlayShell({
   active,
   resolveError,
   regenHref = null,
+  detailHref = null,
 }: {
   gameId: string;
   active: ActiveVersionResponse | null;
   resolveError: ResolveErrorInfo | null;
   /** 非空（作者本人）→ 显示「生成新版本」入口（B2）。 */
   regenHref?: string | null;
+  /** 非空 → 显示「详情」入口（T3 详情页）。 */
+  detailHref?: string | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -168,6 +171,14 @@ export function PlayShell({
           <span className="text-[15px] font-extrabold tracking-tight">Yahaha</span>
         </Link>
         <div className="flex items-center gap-3">
+          {detailHref ? (
+            <Link
+              href={detailHref}
+              className="text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              详情
+            </Link>
+          ) : null}
           {regenHref ? (
             <Link
               href={regenHref}
@@ -200,7 +211,7 @@ export function PlayShell({
           />
         ) : null}
 
-        {status === "loading" ? <LoadingOverlay /> : null}
+        {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
         {status === "failed" ? (
           <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
         ) : null}
@@ -209,9 +220,15 @@ export function PlayShell({
         ) : null}
       </div>
 
-      {/* proof: Source badge bound to the resolved entryUrl + isolation note */}
+      {/* 玩法提示（T1：从 manifest.controls 透传）+ proof: Source badge + isolation note */}
       {active ? (
         <div className="flex flex-col gap-1.5">
+          {active.controls ? (
+            <p className="flex items-start gap-1.5 text-[12px] text-ink-muted">
+              <span className="shrink-0 text-ink-faint">玩法</span>
+              <span>{active.controls}</span>
+            </p>
+          ) : null}
           <SourceBadge url={active.entryUrl} />
           <p className="font-mono text-[11px] text-ink-faint">
             sandbox=&quot;allow-scripts&quot; · cross-origin · runtime {active.runtime} · v
@@ -233,16 +250,17 @@ function resolveErrorMessage(e: ResolveErrorInfo | null): string {
   return e.error;
 }
 
-function LoadingOverlay() {
+function LoadingOverlay({ controls }: { controls: string }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-surface-inset/80 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-3">
+    <div className="absolute inset-0 grid place-items-center bg-surface-inset/80 px-6 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-3 text-center">
         <span
           className="h-8 w-8 animate-spin rounded-full border-2 border-hairline-strong"
           style={{ borderTopColor: "var(--running)" }}
           aria-hidden
         />
         <p className="text-sm text-ink-muted">正在加载远端游戏文件…</p>
+        {controls ? <p className="text-[12px] text-ink-faint">玩法：{controls}</p> : null}
       </div>
     </div>
   );

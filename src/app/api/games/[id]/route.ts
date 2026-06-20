@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { deletePrefix } from "@/lib/storage";
+import { requireGameOwner } from "@/lib/require-game-owner";
 import { errorEnvelope } from "@/lib/contracts/error";
-import { GameDetail } from "@/lib/contracts/games";
+import { GameDetail, GameUpdateRequest } from "@/lib/contracts/games";
 import { dbToWire } from "@/lib/contracts/runtime";
 
 export const runtime = "nodejs";
@@ -62,4 +64,48 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     }),
   );
+}
+
+/**
+ * PATCH /api/games/:id（T2-1）—— 作者改 meta（title/summary/tags）。仅作者（403）。
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const owner = await requireGameOwner(id);
+  if (!owner.ok) return owner.response;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(errorEnvelope("VALIDATION_ERROR", "请求体非合法 JSON"), { status: 422 });
+  }
+  const parsed = GameUpdateRequest.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      errorEnvelope("VALIDATION_ERROR", "参数校验失败", { issues: parsed.error.flatten() }),
+      { status: 422 },
+    );
+  }
+
+  await prisma.game.update({ where: { id }, data: parsed.data });
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * DELETE /api/games/:id（T2-1）—— 作者删除游戏：级联删 Version/PlayEvent/Like/Favorite（Prisma），
+ * 再清 MinIO 产物 `games/{id}/`（best-effort）。仅作者（403）。
+ */
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const owner = await requireGameOwner(id);
+  if (!owner.ok) return owner.response;
+
+  // 先删 DB 行（权威态）：Version/PlayEvent/Like/Favorite 经 onDelete:Cascade 一并删，Task/Asset.gameId 置空。
+  await prisma.game.delete({ where: { id } });
+  // 再清远端产物（孤儿对象无害；失败只记录，不让 500 误导“未删除”）。
+  await deletePrefix(`games/${id}/`).catch((e) =>
+    console.error(`[games.DELETE] deletePrefix games/${id}/ failed:`, e?.message ?? e),
+  );
+  return NextResponse.json({ ok: true });
 }

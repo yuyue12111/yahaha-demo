@@ -44,7 +44,9 @@
 
 - `/create` 等受保护路由经 middleware + 服务端 session 校验。
 - 需登录的 Node API 路由统一经 `requireUser()`（`src/lib/require-user.ts`）：`auth()` 解码 JWT 后**再核对 `uid` 仍在 `User` 表**。签名仍合法但已失效的会话（库重置 / 删号 / 旧 cookie）一律 **401「请重新登录」**，避免后续写库撞外键（Prisma P2003）落成未捕获 500。Prisma 绝不上 Edge —— 该校验只在 Node 路由，middleware 仍用纯 JWT 解码。
-- 资源操作校验归属：发布/重试/删除校验 `authorId`/`userId`，越权返回 403。
+- 资源操作校验归属：发布/重试/删除/改 meta/下架校验 `authorId`/`userId`，越权返回 403。
+- **owner-scoped 管理（已实现，T2-1）**：作者经 `requireGameOwner()` 管理自己的游戏 —— `PATCH /api/games/:id`(改 meta)、`POST /api/games/:id/archive`(下架/恢复 `GameStatus.ARCHIVED`，Home 天然排除)、`DELETE /api/games/:id`(级联删 + 清 MinIO `games/{id}/`，删除封装只在 `storage.ts` 守红线①)。
+- **平台 admin（DEFERRED 2026-06-20）**：跨用户管理 / 全平台可观测聚合面 + `User.role` 权限门未建；当前维护只到 owner-scoped + 基础设施级（MinIO 控制台 :9001 / SQL）。内容审核同 §5 deferred。
 
 ## OAuth 安全（设计）
 

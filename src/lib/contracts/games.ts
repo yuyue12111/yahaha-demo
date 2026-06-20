@@ -8,6 +8,8 @@ export const ActiveVersionResponse = z.object({
   runtime: RuntimeKind,
   manifestUrl: z.string().url(),
   entryUrl: z.string().url(),
+  // T1：玩法提示从 manifest 透传到 Play/详情，让玩家看到键位（数据本就在 manifest.controls）。
+  controls: z.string().default(""),
 });
 export type ActiveVersionResponse = z.infer<typeof ActiveVersionResponse>;
 
@@ -64,3 +66,19 @@ export const GameDetail = z.object({
   favorited: z.boolean().optional(),
 });
 export type GameDetail = z.infer<typeof GameDetail>;
+
+/** PATCH /api/games/:id（作者改 meta，T2-1）。至少一个字段。 */
+export const GameUpdateRequest = z
+  .object({
+    title: z.string().trim().min(1, "标题不能为空").max(80).optional(),
+    summary: z.string().trim().max(500).optional(),
+    tags: z.array(z.string().trim().min(1).max(24)).max(8).optional(),
+  })
+  .refine((d) => d.title !== undefined || d.summary !== undefined || d.tags !== undefined, {
+    message: "至少修改一个字段",
+  });
+export type GameUpdateRequest = z.infer<typeof GameUpdateRequest>;
+
+/** POST /api/games/:id/archive（作者下架/恢复，T2-1）。 */
+export const GameArchiveRequest = z.object({ archived: z.boolean() });
+export type GameArchiveRequest = z.infer<typeof GameArchiveRequest>;

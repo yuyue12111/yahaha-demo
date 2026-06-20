@@ -43,6 +43,7 @@ export async function resolveActiveVersion(id: string): Promise<ResolveResult> {
     runtime: manifest.runtime, // wire 值（保 MED-5：不读 DB 枚举符号）
     manifestUrl: publicUrl(manifestKey),
     entryUrl: publicUrl(entryKey),
+    controls: manifest.controls, // T1：玩法提示透传给 Play/详情
   });
   return { ok: true, data };
 }
