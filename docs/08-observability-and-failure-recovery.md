@@ -10,10 +10,10 @@
 | 生成过程 | `GenerationTask.status/currentStep` 状态流转；`AgentLog` 每节点起止 |
 | Agent IO | `AgentLog.inputSummary/outputSummary` + `tokensIn/Out` + `latencyMs` + `modelProvider`（证多步非黑盒） |
 | 实时进度 | worker → Redis pub/sub → SSE(`/api/tasks/:id/stream`) → Create UI run-timeline；轮询兜底 |
-| 用户操作 | `PlayEvent`（LOAD/START/END/ERROR）+ `playCount`；like/favorite |
+| 用户操作 | `PlayEvent`（LOAD/END/ERROR 已实现，START deferred）经 `POST /api/play-events` 回写 + `playCount`（LOAD 自增）；like/favorite 写入 deferred |
 | 错误日志 | `GenerationTask.error` + 失败节点 `AgentLog(level=ERROR)`；服务端结构化日志（含 taskId 关联） |
 | 演示证据 | Play 的 "Source:&lt;URL&gt;" 徽章、Network 截图、MinIO 控制台对象、SSE 步骤流 |
-| 成本 | token 计入 `AgentLog`，可按任务/用户聚合（设计：成本统计面板） |
+| 成本 | token 计入 `AgentLog`（6 节点全量；确定性节点恒 0）；Create run-timeline **已聚合并展示**每节点 + 总量（mock 估算） |
 
 约定：所有服务端日志带 `taskId`/`gameId`/`userId` 关联键，便于一次演示后回溯。
 

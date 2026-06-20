@@ -25,7 +25,12 @@ const STATE_COLOR: Record<NodeState, string> = {
   failed: "var(--danger)",
 };
 
-export function CreateStudio() {
+export function CreateStudio({
+  regen = null,
+}: {
+  /** 非空 → 在已有游戏上生成新版本（提交带 gameId → packager 产 versionNumber+1）。 */
+  regen?: { gameId: string; title: string } | null;
+} = {}) {
   const [prompt, setPrompt] = useState("");
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -165,7 +170,11 @@ export function CreateStudio() {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), assetIds: uploads.map((u) => u.assetId) }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          assetIds: uploads.map((u) => u.assetId),
+          ...(regen ? { gameId: regen.gameId } : {}),
+        }),
       });
       if (res.status !== 202) {
         const e = await res.json().catch(() => null);
@@ -178,7 +187,7 @@ export function CreateStudio() {
       setSubmitError(e instanceof Error ? e.message : String(e));
       setTaskStatus("FAILED");
     }
-  }, [prompt, uploads, busy, openStream]);
+  }, [prompt, uploads, busy, openStream, regen]);
 
   const retry = useCallback(async () => {
     if (!taskId) return;
@@ -204,6 +213,14 @@ export function CreateStudio() {
   const failed = taskStatus === "FAILED";
   const succeeded = taskStatus === "SUCCEEDED";
 
+  // B3：跨 6 节点聚合生成成本（mock 估算；确定性节点贡献 0）。
+  const logVals = Object.values(logsByAgent);
+  const hasTokens = logVals.some((l) => l?.tokensIn != null || l?.tokensOut != null);
+  const tokenTotal = logVals.reduce(
+    (acc, l) => ({ in: acc.in + (l?.tokensIn ?? 0), out: acc.out + (l?.tokensOut ?? 0) }),
+    { in: 0, out: 0 },
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* 左：创意输入 */}
@@ -214,6 +231,13 @@ export function CreateStudio() {
             描述你的游戏创意，可选附上参考图。提交后由独立 worker 异步跑 6 节点生成流水线。
           </p>
         </div>
+
+        {regen ? (
+          <div className="rounded-lg border border-hairline-brand bg-surface-inset px-3 py-2 text-[13px] text-ink-muted">
+            在《<span className="font-medium text-ink">{regen.title}</span>》上生成新版本
+            —— 产物记为 <span className="font-mono">v+1</span>，生成后可发布切换为该游戏的 active 版本。
+          </div>
+        ) : null}
 
         <div className="rounded-lg border border-hairline bg-surface-inset p-3">
           <textarea
@@ -299,6 +323,14 @@ export function CreateStudio() {
               <span className="text-[12px] text-ink-faint">尚未开始</span>
             )}
           </div>
+          {hasTokens ? (
+            <div className="mb-2 flex items-center justify-between rounded-md border border-hairline bg-surface-inset px-2.5 py-1.5 font-mono text-[11px] text-ink-muted">
+              <span>Σ 生成成本（mock 估算）</span>
+              <span>
+                {tokenTotal.in} in · {tokenTotal.out} out · {tokenTotal.in + tokenTotal.out} tok
+              </span>
+            </div>
+          ) : null}
           <ol className="flex flex-col gap-2">
             {NODES.map((node, i) => {
               const st = nodeState(node.name);
@@ -323,6 +355,9 @@ export function CreateStudio() {
                       <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
                         {st}
                         {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
+                        {log && (log.tokensIn != null || log.tokensOut != null)
+                          ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
+                          : ""}
                       </span>
                     </div>
                     <p className="text-[11px] text-ink-faint">{node.desc}</p>

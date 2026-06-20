@@ -264,6 +264,9 @@ export async function runCoder(_ctx: AgentContext, spec: GameSpec): Promise<Node
   const bytes = files.reduce((n, f) => n + Buffer.byteLength(f.content, "utf8"), 0);
   return {
     output,
+    // 确定性模板（不调模型）→ token 成本恒为 0（B3：6 节点全量记 token）。
+    tokensIn: 0,
+    tokensOut: 0,
     inputSummary: `GameSpec(${spec.title}, mode=${spec.engine?.mode})`,
     outputSummary: `${files.length} 文件 · ${bytes} bytes · index.html+game.js+cover.svg`,
   };

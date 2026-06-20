@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { errorEnvelope, type ErrorCode } from "@/lib/contracts/error";
 import { PublishRequest, PublishResponse } from "@/lib/contracts/publish";
 import { publishGameVersion, type PublishError } from "@/lib/publish";
@@ -18,10 +18,8 @@ const ERROR_MAP: Record<PublishError, { status: number; code: ErrorCode; message
  * 发布后该游戏经 Home 查库出现、经 active-version 解析进 Play。
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json(errorEnvelope("UNAUTHORIZED", "未登录"), { status: 401 });
-  }
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
   const { id } = await params;
 
   let body: unknown;
@@ -41,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const r = await publishGameVersion({
     gameId: id,
     versionId: parsed.data.versionId,
-    userId: session.user.id,
+    userId: gate.user.id,
   });
   if (!r.ok) {
     const m = ERROR_MAP[r.error];

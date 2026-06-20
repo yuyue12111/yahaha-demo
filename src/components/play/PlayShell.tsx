@@ -17,16 +17,21 @@ export function PlayShell({
   gameId,
   active,
   resolveError,
+  regenHref = null,
 }: {
   gameId: string;
   active: ActiveVersionResponse | null;
   resolveError: ResolveErrorInfo | null;
+  /** 非空（作者本人）→ 显示「生成新版本」入口（B2）。 */
+  regenHref?: string | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
   const onloadRef = useRef(false);
+  const loadReportedRef = useRef(false); // LOAD 每次挂载只回写一次（playCount 不被本地重开灌水）
+  const loadAtRef = useRef<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const [status, setStatus] = useState<PlayStatus>(active ? "loading" : "failed");
@@ -47,9 +52,20 @@ export function PlayShell({
 
     loadedRef.current = false;
     onloadRef.current = false;
+    loadReportedRef.current = false;
+    loadAtRef.current = null;
     setStatus("loading");
     setScore(0);
     setFail({ url: null, reason: "" });
+
+    // 埋点回写（docs/06/08）：同源 POST，fire-and-forget，失败不影响游玩。
+    const report = (type: "LOAD" | "END" | "ERROR", extra?: Record<string, number>) => {
+      void fetch("/api/play-events", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gameId, type, ...extra }),
+      }).catch(() => {});
+    };
 
     const clearWatchdog = () => {
       if (watchdogRef.current) {
@@ -84,6 +100,11 @@ export function PlayShell({
           loadedRef.current = true;
           clearWatchdog();
           setStatus("loaded");
+          if (!loadReportedRef.current) {
+            loadReportedRef.current = true; // 本地重开重复广播 GAME_LOADED → 只第一次计一次 play
+            loadAtRef.current = Date.now();
+            report("LOAD");
+          }
           break;
         case "GAME_SCORE":
           setScore(msg.payload.score);
@@ -93,11 +114,16 @@ export function PlayShell({
           clearWatchdog();
           if (msg.payload?.score != null) setScore(msg.payload.score);
           setStatus("ended");
+          report("END", {
+            ...(msg.payload?.score != null ? { score: msg.payload.score } : {}),
+            ...(loadAtRef.current ? { durationMs: Date.now() - loadAtRef.current } : {}),
+          });
           break;
         case "GAME_ERROR":
           clearWatchdog();
           setStatus("failed");
           setFail({ url: entryUrl, reason: msg.payload.message });
+          report("ERROR");
           break;
       }
     };
@@ -107,7 +133,7 @@ export function PlayShell({
       window.removeEventListener("message", onMessage);
       clearWatchdog();
     };
-  }, [active, reloadKey]);
+  }, [active, reloadKey, gameId]);
 
   const handleRetry = useCallback(() => {
     if (active) {
@@ -142,6 +168,14 @@ export function PlayShell({
           <span className="text-[15px] font-extrabold tracking-tight">Yahaha</span>
         </Link>
         <div className="flex items-center gap-3">
+          {regenHref ? (
+            <Link
+              href={regenHref}
+              className="rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              ＋ 新版本
+            </Link>
+          ) : null}
           {status === "loaded" || status === "ended" ? (
             <span className="font-mono text-[12px] text-ink-muted">Score {score}</span>
           ) : null}

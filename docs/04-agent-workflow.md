@@ -18,7 +18,7 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
 
 | 节点 | 输入 | 输出 | 职责 |
 |------|------|------|------|
-| `INGEST` | `{ prompt, assetRefs[] }` | `{ brief, assetDescriptions[] }` | 归一多模态：图片经 `VISION_MODEL` 转场景/资产描述，让上传**真影响生成**；无 vision 模型则退化纯文本。 |
+| `INGEST` | `{ prompt, assetRefs[] }` | `{ brief, assetDescriptions[] }` | 归一多模态：图片经 `VISION_MODEL` 转场景/资产描述影响生成；无 vision 模型则退化纯文本。**诚实口径（2026-06-20）**：当前 `ingest.ts` 调 `vision({hint,seedKey})` 只传文件名/MIME（mock 据其确定性做种 → 异上传异产物），**未传 `imageUrl`**；`vision({imageUrl})` 真读像素的接线已在（`model/types.ts`+`openai.ts`），但 ingest 喂像素 URL **DEFERRED**（接真模型时补）。 |
 | `PLANNER` | `{ brief }` | `GameSpec` | 创意 → 结构化设计规格（见下 Schema）。 |
 | `ASSET_CURATOR` | `{ spec, assets[] }` | `AssetPlan` | 把上传素材映射到精灵/背景，缺口用占位/生成；输出含 S3 key 映射。 |
 | `CODER` | `{ spec, assetPlan }` | `{ files: {path,content}[] }` | 产出自包含 HTML5 游戏（满足运行时契约：挂载 `#game-root` + postMessage 生命周期）。内部可带有限自修复。 |

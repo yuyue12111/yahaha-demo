@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { presignGet, presignPut } from "@/lib/storage";
@@ -17,10 +17,9 @@ const EXPIRES_IN = 300;
  * 类型白名单（415）、大小限额（413）。app 绝不经手字节。
  */
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json(errorEnvelope("UNAUTHORIZED", "未登录"), { status: 401 });
-  }
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const userId = gate.user.id;
 
   let body: unknown;
   try {
@@ -57,7 +56,7 @@ export async function POST(req: Request) {
   // 先建占位 Asset 拿 cuid，再据其 id 拼 key（uploads/{userId}/{assetId}.{ext}）。
   const asset = await prisma.asset.create({
     data: {
-      ownerId: session.user.id,
+      ownerId: userId,
       kind: "UPLOAD",
       s3Key: "pending",
       contentType,
@@ -66,7 +65,7 @@ export async function POST(req: Request) {
     },
     select: { id: true },
   });
-  const key = `uploads/${session.user.id}/${asset.id}.${ext}`;
+  const key = `uploads/${userId}/${asset.id}.${ext}`;
   await prisma.asset.update({ where: { id: asset.id }, data: { s3Key: key } });
 
   const [putUrl, getUrl] = await Promise.all([

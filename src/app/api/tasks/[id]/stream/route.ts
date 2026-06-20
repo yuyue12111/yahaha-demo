@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { prisma } from "@/lib/db";
 import { publicUrl } from "@/lib/storage";
 import { errorEnvelope } from "@/lib/contracts/error";
@@ -18,8 +18,8 @@ const json = (body: unknown, status: number) =>
  * 先发当前快照（status + 既有 logs）让晚订阅者追平，再转发实时事件；done 后关闭。仅本人可订阅。
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return json(errorEnvelope("UNAUTHORIZED", "未登录"), 401);
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const task = await prisma.generationTask.findUnique({
@@ -27,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     include: { logs: { orderBy: { seq: "asc" } } },
   });
   if (!task) return json(errorEnvelope("NOT_FOUND", "任务不存在"), 404);
-  if (task.userId !== session.user.id) return json(errorEnvelope("FORBIDDEN", "非本人任务"), 403);
+  if (task.userId !== gate.user.id) return json(errorEnvelope("FORBIDDEN", "非本人任务"), 403);
 
   const encoder = new TextEncoder();
 

@@ -19,7 +19,26 @@ const THEME_KEYWORDS: Array<{ k: RegExp; theme: string; hue: number }> = [
   { k: /fire|lava|volcano|heat|火|岩浆/i, theme: "molten arcade", hue: 18 },
   { k: /ice|snow|frost|winter|冰|雪/i, theme: "frostbyte grid", hue: 205 },
   { k: /candy|sweet|sugar|糖|甜/i, theme: "candy circuit", hue: 330 },
+  { k: /medieval|castle|knight|kingdom|中世纪|城堡|骑士|王国/i, theme: "castle torchlight", hue: 34 },
+  { k: /magic|wizard|arcane|spell|rune|魔法|法师|符文|奥术/i, theme: "arcane sigils", hue: 275 },
+  { k: /desert|sand|dune|oasis|沙漠|沙丘|绿洲/i, theme: "sunscorch dunes", hue: 40 },
+  { k: /wasteland|ruin|apocalyp|废土|末日|废墟/i, theme: "rustfall wastes", hue: 22 },
+  { k: /steam|steampunk|gear|brass|蒸汽|齿轮|黄铜/i, theme: "brass steamworks", hue: 30 },
+  { k: /crystal|gem|prism|diamond|水晶|宝石|棱镜/i, theme: "prismatic cavern", hue: 168 },
+  { k: /haunted|ghost|spooky|grave|幽灵|鬼|墓地|恐怖/i, theme: "haunted hollow", hue: 285 },
 ];
+
+/** prompt 关键词 → 玩法 mode（C1：替代 rng.pick，让玩法贴合语义；无匹配才退化随机）。 */
+const MODE_KEYWORDS: Array<{ k: RegExp; mode: (typeof MODES)[number] }> = [
+  { k: /catch|collect|grab|gather|接住|接|抓|收集|捡/i, mode: "catch" },
+  { k: /react|reflex|tap|click|aim|whack|反应|点击|瞄|敲/i, mode: "reaction" },
+  { k: /dodge|avoid|evade|escape|躲避|躲|闪避|避开/i, mode: "dodge" },
+  { k: /run|runner|parkour|dash|sprint|跑酷|奔跑|冲刺|跑/i, mode: "dodge" }, // 跑酷 → 横向躲避骨架
+];
+function pickMode(brief: string, rng: Rng): (typeof MODES)[number] {
+  const m = MODE_KEYWORDS.find((x) => x.k.test(brief));
+  return m ? m.mode : rng.pick(MODES);
+}
 const FALLBACK_THEMES = [
   { theme: "synthwave grid", hue: 280 },
   { theme: "neon arcade", hue: 320 },
@@ -89,7 +108,7 @@ export function synthesizeGameSpec(rng: Rng, brief: string): Record<string, unkn
 
   const mechanics = rng.sample(MECHANICS_POOL, rng.int(2, 3));
   const controls = rng.pick(CONTROLS_POOL);
-  const mode = rng.pick(MODES);
+  const mode = pickMode(brief, rng); // 关键词驱动（语义贴合）；无匹配退化确定性随机
 
   const winCondition =
     mode === "reaction" ? "在限时内点中尽量多的目标累积高分" : "存活并尽可能久地累积分数";

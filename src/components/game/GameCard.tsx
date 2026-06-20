@@ -4,8 +4,9 @@ import type { GameCard as GameCardData } from "@/lib/contracts/games";
 /**
  * 游戏卡（docs/10:63 §Game card + docs/00:33 / 02 / 03 的六项契约）：
  * 竖版 3:4 封面满铺 + border-brand，左下 play-count 徽章；卡下六项 ——
- * 标题 · 简介(截断) · 标签(pill) · 作者行(头像+名) · 发布时间。
+ * 标题 · 简介(截断) · 标签(可点 → /?tag=) · 作者行(头像+名) · 发布时间。
  * 封面是 MinIO `:9000` 跨域图（img-src 未被站点 CSP 限）。
+ * 注：外层不是单一 <a>（标签是独立 link，避免嵌套 anchor）；封面+标题为 Play 链接。
  */
 export function GameCard({ game }: { game: GameCardData }) {
   const initial = game.author.displayName.trim().charAt(0).toUpperCase() || "?";
@@ -13,24 +14,26 @@ export function GameCard({ game }: { game: GameCardData }) {
   const publishedDate = game.publishedAt ? game.publishedAt.slice(0, 10) : null;
 
   return (
-    <Link href={`/play/${game.id}`} className="group block">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset">
-        {game.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 跨域 MinIO 封面，刻意不用 next/image
-          <img
-            src={game.coverUrl}
-            alt={game.title}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="h-full w-full bg-grad-play opacity-30" aria-hidden />
-        )}
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">
-          ▶ {game.playCount}
-        </span>
-      </div>
+    <div className="group block">
+      <Link href={`/play/${game.id}`} className="block">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset">
+          {game.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 跨域 MinIO 封面，刻意不用 next/image
+            <img
+              src={game.coverUrl}
+              alt={game.title}
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="h-full w-full bg-grad-play opacity-30" aria-hidden />
+          )}
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">
+            ▶ {game.playCount}
+          </span>
+        </div>
 
-      <h3 className="mt-2 truncate text-[15px] font-bold text-ink">{game.title}</h3>
+        <h3 className="mt-2 truncate text-[15px] font-bold text-ink group-hover:text-ink">{game.title}</h3>
+      </Link>
 
       {game.summary ? (
         <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-ink-muted">{game.summary}</p>
@@ -39,12 +42,13 @@ export function GameCard({ game }: { game: GameCardData }) {
       {game.tags.length > 0 ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {game.tags.slice(0, 3).map((t) => (
-            <span
+            <Link
               key={t}
-              className="rounded-pill border border-hairline px-2 py-0.5 text-[11px] text-ink-muted"
+              href={`/?tag=${encodeURIComponent(t)}`}
+              className="rounded-pill border border-hairline px-2 py-0.5 text-[11px] text-ink-muted transition-colors hover:border-hairline-strong hover:text-ink"
             >
               {t}
-            </span>
+            </Link>
           ))}
         </div>
       ) : null}
@@ -65,6 +69,6 @@ export function GameCard({ game }: { game: GameCardData }) {
           </time>
         ) : null}
       </div>
-    </Link>
+    </div>
   );
 }

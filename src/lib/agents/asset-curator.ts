@@ -31,6 +31,9 @@ export async function runAssetCurator(
   const output = AssetPlanSchema.parse({ mappings, placeholders });
   return {
     output,
+    // 确定性节点（不调模型）→ token 成本恒为 0（B3：6 节点全量记 token 以便聚合统计）。
+    tokensIn: 0,
+    tokensOut: 0,
     inputSummary: `${spec.requiredAssets.length} 个所需角色 ⨯ ${assetRefs.length} 个上传`,
     outputSummary: `映射 ${mappings.length} · 占位 ${placeholders.length}`,
   };

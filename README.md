@@ -67,13 +67,18 @@ docker compose up --build
 ## 完成度说明
 
 **已实现（核心）**
-- 全闭环：Auth（邮箱注册/登录/登出、JWT httpOnly 抗刷新、`/create` 中间件+服务端双守卫）→ Create（多模态输入、presigned 直传、异步 6 节点流水线、SSE run-timeline、跨域预览）→ 发布 → Home（查库）→ Play（远端 manifest/bundle 隔离运行，四态 loading/loaded/failed/ended）。
+- 全闭环：Auth（邮箱注册/登录/登出、JWT httpOnly 抗刷新、`/create` 中间件+服务端双守卫、失效会话干净 401）→ Create（多模态输入、presigned 直传、异步 6 节点流水线、SSE run-timeline、跨域预览）→ 发布 → Home（查库）→ Play（远端 manifest/bundle 隔离运行，四态 loading/loaded/failed/ended）。
 - 红线①②④ 结构性成立；Fatal #1 存储边界 eslint 守卫；红线③ 输入敏感确定性 mock。
 - 失败恢复：节点内修复重试、任务超时看护、MinIO 抖动失败态 + retry、worker 崩溃 reaper 回收、PACKAGER 原子写无孤儿、assetIds 越权 403。
+- 浏览/检索：Home 搜索（标题/简介）+ 可点标签筛选 + 最新/最热排序 + 游标分页；`GET /api/games/:id` 详情（meta + 作者 + 活跃版本 + 统计）。
+- 运行时埋点：Play 回写 `PlayEvent`（LOAD/END/ERROR）→ `playCount` 自增（LOAD）；Create run-timeline 聚合并展示生成成本（6 节点 token）。
+- 版本管理：作者在自己游戏的 Play 页「＋ 新版本」→ `/create?gameId=` 生成 `versionNumber+1`，发布即切换 active 版本。
+- 安全增强：per-user 任务频率限额 + 公开埋点 `/api/play-events` 节流（Redis 固定窗口，429，fail-open）；失效会话存在性再校验（401 而非 500）；详情页非作者不可见草稿（404）。
 - 可复现：一条 `docker compose up` 冷启动出 ≥3 已发布游戏（含 1 个 Create 真产出）。
 
 **Mock / 设计占位**
 - 默认 `mock` 模型（确定性、输入敏感）；真实 GPT-5.5 走同一 `ModelClient` seam，填 `MODEL_*` 即切。
+- **多模态上传**：当前上传**仅经文件名 / MIME 类型**影响生成（mock 据其做种 → 异上传异产物，红线③成立）；`vision({imageUrl})` 真读像素的接线已在（`model/types.ts` + `openai.ts`），但 `ingest.ts` 喂像素 URL **deferred**（接真模型时补，见 `docs/04` INGEST 行）。
 - OAuth：保留 `Account` 数据模型 + 流程设计（`docs/07`），缺省关闭，未真接 Google/GitHub。
 - 封面走调色板 SVG 缩略图（降级阶梯）；Validator headless 截图为可选未启。
 
@@ -82,9 +87,10 @@ docker compose up --build
 - VALIDATOR→fallback 替换路径 deferred（CODER 为确定性模板，结构上已是确定性产物）。
 - VALIDATOR 的 AST 解析（acorn/esbuild）deferred，当前为结构/契约存在性 + 体积静态校验。
 - `remixOfVersionId` accepted-but-ignored（Remix deferred 至加分轮）。
-- 成本统计 / 速率限额 / 内容审核为加分项，仅设计。
+- 点赞 / 收藏：`Like`/`Favorite` 数据模型 + 统计读出已在（详情页 `stats` 真计数），但写入端点 + UI deferred（故详情页 `liked/favorited` 暂不返回）。
+- 内容审核 deferred；`PlayEvent.START` 未发（仅 LOAD/END/ERROR）。
 
-**再给一周**：真接 GPT-5.5 跑真实质量产出；Remix + 版本管理 UI；play-events 埋点 + 点赞/收藏 + 详情页；durable-step 续跑；OAuth 真跑通其一。
+**再给一周**：真接 GPT-5.5 跑真实质量产出 + ingest 喂 imageUrl；Remix；点赞/收藏写入 + UI；durable-step 续跑；OAuth 真跑通其一。
 
 ## 已知问题与限制
 
