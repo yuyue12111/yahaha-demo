@@ -72,6 +72,18 @@ export async function getObjectText(key: string): Promise<string> {
   return res.Body.transformToString("utf-8");
 }
 
+/**
+ * Read an object's raw bytes (server-side). Used by INGEST to feed real uploaded image pixels
+ * into model.vision as an inline base64 data URL — works for BOTH local mock and a remote
+ * GPT-5.5 endpoint (a presigned localhost:9000 URL would be unreachable from an external model).
+ * Byte access stays inside storage.ts (红线①); callers never touch fs/S3 directly.
+ */
+export async function getObjectBytes(key: string): Promise<Uint8Array> {
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  if (!res.Body) throw new Error(`Empty body for object ${key}`);
+  return res.Body.transformToByteArray();
+}
+
 /** Write an object. Used by later checkpoints (packager); included now for completeness. */
 export async function putObject(
   key: string,
