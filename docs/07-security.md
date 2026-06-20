@@ -48,10 +48,13 @@
 - **owner-scoped 管理（已实现，T2-1）**：作者经 `requireGameOwner()` 管理自己的游戏 —— `PATCH /api/games/:id`(改 meta)、`POST /api/games/:id/archive`(下架/恢复 `GameStatus.ARCHIVED`，Home 天然排除)、`DELETE /api/games/:id`(级联删 + 清 MinIO `games/{id}/`，删除封装只在 `storage.ts` 守红线①)。
 - **平台 admin（DEFERRED 2026-06-20）**：跨用户管理 / 全平台可观测聚合面 + `User.role` 权限门未建；当前维护只到 owner-scoped + 基础设施级（MinIO 控制台 :9001 / SQL）。内容审核同 §5 deferred。
 
-## OAuth 安全（设计）
+## OAuth 安全（已实现，env-gated，2026-06-21）
 
-- `Account` 表与 `User` 解耦；token 加密存储（demo 可空）。
-- 回调校验 `state`/PKCE（由 Auth.js 提供）；按 `providerAccountId` 防账号劫持，绑定时校验邮箱归属。
+- **接入**：Google / GitHub provider 在 `src/lib/auth.ts` 注册，**env-gated**——配齐 `{PROVIDER}_CLIENT_ID/SECRET` 才注册（仿模型 seam），缺则不启用、登录页只显示邮箱登录（红线⑤：无密钥也能跑）。`oauthEnabled` 由服务端登录/注册页读出，决定是否渲染按钮。
+- **数据模型**：`Account` 表与 `User` 解耦（`@@unique([provider, providerAccountId])`）；access/refresh token + expiresAt 落 `Account` 行（demo 明文，生产应加密）。
+- **账号绑定**（JWT 策略 + 无 DB adapter → `auth.ts` `linkOAuthAccount` 手动落库）：① 按 `(provider, providerAccountId)` 命中已绑 `Account` → 复用其 `User`（重复登录稳定同一身份）；② 否则按 email upsert `User`（同邮箱的 Credentials 账号可被绑定），再建 `Account`。GitHub 邮箱私密时合成稳定占位邮箱。
+- **回调**：`/api/auth/callback/{google,github}`；`state`/PKCE 由 Auth.js 提供。读 Prisma 的 jwt 回调只在 Node `/api/auth` 路由跑，middleware 走 `auth.config`（无 Prisma）→ Prisma 绝不上 Edge。
+- **后续扩展**：再加 provider = 在 `auth.ts` 依葫芦加一段 env-gated push + `AuthProvider` 枚举值即可；账号合并（同邮箱跨 provider）已天然支持。
 
 ## 实现状态标注（交付前更新）
 

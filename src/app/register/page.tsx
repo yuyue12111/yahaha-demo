@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/Logo";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
+import { oauthEnabled } from "@/lib/auth";
+
+// 运行时渲染：OAuth 按钮按运行时 env 凭据决定（env-gated），不可静态预渲染。
+export const dynamic = "force-dynamic";
 
 export default function RegisterPage() {
   return (
@@ -15,7 +19,7 @@ export default function RegisterPage() {
         <h1 className="text-[18px] font-bold text-ink">创建账号</h1>
         <p className="mb-5 mt-1 text-[13px] text-ink-muted">加入 Yahaha，开始创作与游玩。</p>
         <Suspense>
-          <AuthForm mode="register" />
+          <AuthForm mode="register" oauth={oauthEnabled} />
         </Suspense>
         <p className="mt-4 text-[13px] text-ink-muted">
           已有账号？

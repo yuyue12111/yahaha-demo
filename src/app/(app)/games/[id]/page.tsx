@@ -6,6 +6,8 @@ import { resolveActiveVersion } from "@/lib/active-version";
 import { Button } from "@/components/ui/Button";
 import { RemoteImg } from "@/components/ui/RemoteImg";
 import { GameManagePanel } from "@/components/game/GameManagePanel";
+import { LikeButton } from "@/components/game/LikeButton";
+import { BookmarkButton } from "@/components/game/BookmarkButton";
 
 // 单游戏详情页（T3）：承载玩法提示（T1）+ 统计 + 立即游玩 + 作者管理面板（T2-1）。
 export const dynamic = "force-dynamic";
@@ -18,7 +20,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [game, session, active] = await Promise.all([
+  const session = await auth();
+  const userId = session?.user?.id ?? null;
+  const [game, active, liked, favorited] = await Promise.all([
     prisma.game.findUnique({
       where: { id },
       include: {
@@ -26,8 +30,14 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         _count: { select: { likes: true, favorites: true } },
       },
     }),
-    auth(),
     resolveActiveVersion(id),
+    // 当前用户对本游戏的 点赞/收藏 态（未登录 → null，按钮以未激活态渲染、点击引导登录）。
+    userId
+      ? prisma.like.findUnique({ where: { userId_gameId: { userId, gameId: id } }, select: { id: true } })
+      : Promise.resolve(null),
+    userId
+      ? prisma.favorite.findUnique({ where: { userId_gameId: { userId, gameId: id } }, select: { id: true } })
+      : Promise.resolve(null),
   ]);
 
   if (!game) notFound();
@@ -80,9 +90,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           <div className="flex items-center gap-3 font-mono text-[12px] text-ink-muted">
-            <span>▶ {game.playCount}</span>
-            <span>♥ {game._count.likes}</span>
-            <span>★ {game._count.favorites}</span>
+            <span>▶ {game.playCount} 次游玩</span>
           </div>
 
           {game.summary ? <p className="text-sm leading-relaxed text-ink-muted">{game.summary}</p> : null}
@@ -109,7 +117,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             </p>
           ) : null}
 
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             {active.ok ? (
               <Button href={`/play/${game.id}`} variant="play" size="md">
                 ▶ 立即游玩
@@ -117,8 +125,16 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             ) : (
               <span className="text-[13px] text-ink-faint">暂无可玩版本</span>
             )}
+            {/* 点赞 / 收藏（Home 加分项；登录后真写，未登录引导登录） */}
+            <LikeButton gameId={game.id} initialLiked={!!liked} initialCount={game._count.likes} />
+            <BookmarkButton
+              gameId={game.id}
+              initialFavorited={!!favorited}
+              tone="control"
+              count={game._count.favorites}
+            />
             {active.ok ? (
-              <span className="font-mono text-[11px] text-ink-faint">
+              <span className="ml-auto font-mono text-[11px] text-ink-faint">
                 runtime {active.data.runtime} · v{active.data.versionNumber}
               </span>
             ) : null}
