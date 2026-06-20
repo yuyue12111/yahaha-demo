@@ -2,18 +2,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Brand } from "@/components/brand/Logo";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
 
 export default function LoginPage() {
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden px-4">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 28% 18%, rgba(192,59,255,.18), transparent 52%), radial-gradient(circle at 80% 92%, rgba(39,224,255,.14), transparent 52%)",
-        }}
-        aria-hidden
-      />
+      <AmbientBackdrop variant="auth" />
       <div className="relative w-full max-w-sm rounded-xl border border-hairline bg-surface p-7 shadow-modal">
         <Link href="/" className="mb-5 inline-flex">
           <Brand float />

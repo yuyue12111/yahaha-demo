@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { SearchHotkey } from "@/components/layout/SearchHotkey";
 import { Brand } from "@/components/brand/Logo";
+import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
 
 /**
  * App 外壳（参考稿 Home）：左侧栏（品牌 + 创作主胶囊 + 导航）+ 顶栏（全局搜索 + 通知 + 账号 avatar）。
@@ -13,6 +14,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const collapsed = (await cookies()).get("yahaha-sidebar-collapsed")?.value === "1";
   return (
     <div className="flex min-h-screen">
+      {/* a11y：跳到主内容（键盘/读屏免逐个 Tab 穿过侧栏+顶栏，WCAG 2.4.1） */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink focus:px-4 focus:py-2 focus:text-[13px] focus:font-bold focus:text-bg focus:shadow-modal"
+      >
+        跳到主内容
+      </a>
       <Suspense
         fallback={
           <div
@@ -74,7 +82,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Brand size={26} />
           <UserMenu />
         </header>
-        <main className="flex-1 px-5 py-5 md:px-8">{children}</main>
+        <main id="main-content" className="relative isolate flex-1 px-5 py-5 md:px-8">
+          {/* 全站共享氛围底（克制）：让 Home/我的/详情与 Create 的沉浸基调连成一体 */}
+          <AmbientBackdrop variant="subtle" />
+          {children}
+        </main>
       </div>
     </div>
   );
