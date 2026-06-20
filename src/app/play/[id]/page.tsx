@@ -16,11 +16,22 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
   ]);
   const isOwner = !!(session?.user && game && game.authorId === session.user.id);
 
+  // 收藏书签态：登录用户查一次该游戏是否已收藏。
+  const canFavorite = !!session?.user;
+  const favorited = canFavorite
+    ? !!(await prisma.favorite.findUnique({
+        where: { userId_gameId: { userId: session!.user!.id, gameId: id } },
+        select: { id: true },
+      }))
+    : false;
+
   return (
     <PlayShell
       gameId={id}
       title={game?.title ?? "游戏"}
       playCount={game?.playCount ?? 0}
+      canFavorite={canFavorite}
+      favorited={favorited}
       active={result.ok ? result.data : null}
       resolveError={
         result.ok ? null : { status: result.status, error: result.error, detail: result.detail ?? null }

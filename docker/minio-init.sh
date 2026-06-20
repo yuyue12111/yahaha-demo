@@ -24,8 +24,10 @@ echo "[minio-init] MinIO ready."
 # 1) bucket (idempotent)
 mc mb --ignore-existing "${ALIAS}/${BUCKET}"
 
-# 2) public read on games/* ONLY (uploads/* stays private). Enables unsigned cross-origin iframe nav.
+# 2) public read on games/* + profile/* (uploads/* stays private). games/* = unsigned cross-origin
+#    iframe nav；profile/* = 公开头像/背景图（浏览器 <img> 直读）。
 mc anonymous set download "${ALIAS}/${BUCKET}/games"
+mc anonymous set download "${ALIAS}/${BUCKET}/profile"
 
 # 3) seed bundles (bind-mounted at /seed) → games/<slug>/<ver>/  (遍历，支持多个预制游戏)
 echo "[minio-init] uploading seed bundles ..."

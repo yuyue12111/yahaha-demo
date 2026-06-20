@@ -101,6 +101,31 @@ export async function listRecommendedGames(limit = 12): Promise<GameCard[]> {
   return [...items].sort((a, b) => hash(a.id) - hash(b.id)).slice(0, limit);
 }
 
+/** 当前用户已收藏的 gameId 列表（用于给卡片书签按钮透传初始态；客户端组件用数组而非 Set）。 */
+export async function getFavoriteIds(userId: string): Promise<string[]> {
+  const rows = await prisma.favorite.findMany({ where: { userId }, select: { gameId: true } });
+  return rows.map((r) => r.gameId);
+}
+
+/** 「我的」页 Favorites tab：用户收藏的已发布游戏（真实）。 */
+export async function listFavoriteGames(userId: string): Promise<GameCard[]> {
+  const favs = await prisma.favorite.findMany({
+    where: { userId, game: { status: "PUBLISHED" } },
+    include: { game: { include: { author: { select: { id: true, displayName: true } } } } },
+    orderBy: { createdAt: "desc" },
+  });
+  return favs.map((f) => ({
+    id: f.game.id,
+    title: f.game.title,
+    summary: f.game.summary,
+    coverUrl: f.game.coverUrl,
+    tags: f.game.tags,
+    author: { id: f.game.author.id, displayName: f.game.author.displayName },
+    publishedAt: f.game.publishedAt ? f.game.publishedAt.toISOString() : null,
+    playCount: f.game.playCount,
+  }));
+}
+
 /** 「我的」页：当前用户的已发布作品 + 草稿数 + 累计游玩（真实，作者维度）。 */
 export async function listGamesByAuthor(
   authorId: string,
