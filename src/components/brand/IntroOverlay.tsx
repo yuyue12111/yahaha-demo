@@ -234,16 +234,18 @@ export function IntroOverlay() {
         opacity: revealing ? 0 : 1,
         pointerEvents: revealing ? "none" : "auto",
       }}
-      aria-hidden
+      role="presentation"
     >
-      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+      {/* 装饰层各自 aria-hidden（不在根加，否则会把可聚焦的「跳过」钮埋进隐藏子树，违反 aria-hidden-focus） */}
+      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" aria-hidden />
       {/* 暗角 vignette */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{ background: "radial-gradient(120% 100% at 50% 50%,transparent 52%,rgba(6,4,13,.55) 100%)" }}
+        aria-hidden
       />
       {/* wordmark + tagline */}
-      <div className="pointer-events-none absolute left-0 right-0 top-[63%] text-center">
+      <div className="pointer-events-none absolute left-0 right-0 top-[63%] text-center" aria-hidden>
         <div className="text-[clamp(28px,4.4vw,46px)] font-extrabold leading-none tracking-[0.04em]">
           {["Y", "a", "h", "a", "h", "a"].map((ch, i) => (
             <span
@@ -272,6 +274,7 @@ export function IntroOverlay() {
       <button
         type="button"
         onClick={skip}
+        aria-label="跳过入场动画"
         className="absolute right-7 top-6 z-[6] rounded-pill border border-hairline-strong bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-ink-muted backdrop-blur transition-colors hover:bg-white/10 hover:text-ink"
       >
         跳过 ▸

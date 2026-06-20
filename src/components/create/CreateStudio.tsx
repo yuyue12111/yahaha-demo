@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { YForkLogo } from "@/components/brand/Logo";
+import { AmbientBackdrop } from "@/components/brand/AmbientBackdrop";
+import { StatusChip } from "@/components/ui/StatusChip";
 import type { AgentLogDTO, AgentName, TaskStatus, TaskDoneData } from "@/lib/contracts/tasks";
 import { PreviewPane } from "./PreviewPane";
 
@@ -471,16 +473,7 @@ export function CreateStudio({
                 {/* 行1：节点名 + 状态胶囊（参考稿） */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13.5px] font-semibold text-ink">{node.label}</span>
-                  <span
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-pill px-2 py-0.5 font-mono text-[10px]"
-                    style={{ color: STATE_COLOR[st], background: `color-mix(in srgb, ${STATE_COLOR[st]} 14%, transparent)` }}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${st === "running" ? "yh-dotpulse" : ""}`}
-                      style={{ background: STATE_COLOR[st] }}
-                    />
-                    {STATE_LABEL[st]}
-                  </span>
+                  <StatusChip color={STATE_COLOR[st]} label={STATE_LABEL[st]} pulse={st === "running"} mono size="sm" />
                 </div>
                 {/* 行2：描述 + 耗时/token + chevron（参考稿） */}
                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -579,31 +572,8 @@ export function CreateStudio({
 
   return (
     <div className="relative -mx-5 -my-5 min-h-[calc(100svh-4rem)] md:-mx-8">
-      {/* 沉浸式氛围：呼吸月食辉光 + 极慢轨道环 + 暗角，贯穿空/忙两态（整体性来源） */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div
-          className="absolute inset-0"
-          style={{ background: "radial-gradient(120% 78% at 50% 0%, rgba(124,92,255,.10), transparent 58%)" }}
-        />
-        <div
-          className="yh-breathe absolute left-1/2 top-[27%] h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{
-            background:
-              "radial-gradient(closest-side, rgba(39,224,255,.13), rgba(192,59,255,.085) 46%, transparent 72%)",
-          }}
-        />
-        <div
-          className="yh-orbit absolute left-1/2 top-[27%] h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[.06]"
-          style={{
-            background:
-              "conic-gradient(from 0deg, transparent, rgba(124,92,255,.6) 12%, transparent 32%, transparent 62%, rgba(39,224,255,.55) 78%, transparent 96%)",
-          }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{ background: "radial-gradient(132% 100% at 50% 38%, transparent 54%, rgba(6,4,13,.62) 100%)" }}
-        />
-      </div>
+      {/* 沉浸式氛围（整体性来源，与全站 AmbientBackdrop 同源）：呼吸月食辉光 + 极慢轨道环 + 暗角 */}
+      <AmbientBackdrop variant="hero" />
 
       {!hasConvo ? (
         /* ─────────────── 空状态：居中沉浸 hero（输入框为主角）─────────────── */
@@ -655,16 +625,7 @@ export function CreateStudio({
               <div className="text-[15px] font-extrabold leading-tight tracking-tight text-ink">Create</div>
               <div className="font-mono text-[11px] tracking-wide text-ink-faint">ai-worker · 6-node pipeline</div>
             </div>
-            <span
-              className="inline-flex items-center gap-1.5 rounded-pill px-3 py-1 font-mono text-[11px]"
-              style={{ color: statusPill.color, background: `color-mix(in srgb, ${statusPill.color} 14%, transparent)` }}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${statusPill.pulse ? "yh-dotpulse" : ""}`}
-                style={{ background: statusPill.color }}
-              />
-              {statusPill.text}
-            </span>
+            <StatusChip color={statusPill.color} label={statusPill.text} pulse={statusPill.pulse} mono />
           </div>
 
           {/* thread */}

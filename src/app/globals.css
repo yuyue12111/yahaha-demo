@@ -15,14 +15,21 @@
   --surface-inset: #100c18;
   --text: #f4f1fa;
   --text-muted: #9d95b0;
-  --text-faint: #7a7290;
+  /* a11y：提亮以满足 WCAG AA（小字信息文本对各暗底 ≥4.5:1）；原 #7a7290 仅 ~3.8–4.3 不达标 */
+  --text-faint: #8d84a3;
   --border: rgba(255, 255, 255, 0.07);
   --border-strong: rgba(255, 255, 255, 0.12);
   --border-brand: rgba(124, 92, 255, 0.18);
 
+  /* brand 实色（单一真源；DOM 内联/光晕用 color-mix(... var(--brand-*) ...) 取代散落裸 hex） */
+  --brand-magenta: #ff3ba7;
+  --brand-purple: #c03bff;
+  --brand-cyan: #27e0ff;
+  --brand-blue: #3b82f6;
+
   /* brand gradients (双招牌：洋红→紫 = Play/消费；青→蓝 = Create/AI) */
-  --grad-play: linear-gradient(135deg, #ff3ba7, #c03bff);
-  --grad-create: linear-gradient(135deg, #27e0ff, #3b82f6);
+  --grad-play: linear-gradient(135deg, var(--brand-magenta), var(--brand-purple));
+  --grad-create: linear-gradient(135deg, var(--brand-cyan), var(--brand-blue));
   --grad-create-fg: #04223a; /* 青底用深字（docs/10:33） */
 
   /* status (映射 TaskStatus / Play 状态) */
@@ -197,4 +204,6 @@ html.yh-cursor-active * { cursor: none !important; }
 .yh-cur.is-hidden { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .yh-cur-ring .yh-cur-reticle svg { animation: none; }
+  /* 加载 spinner（Tailwind 内置）：reduced-motion 下大幅放慢而非冻结，保留"忙碌"语义又不刺激 */
+  .animate-spin { animation-duration: 1.6s !important; }
 }
