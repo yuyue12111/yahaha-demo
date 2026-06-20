@@ -12,8 +12,20 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/**
+ * 颜色守卫（docs/07 纵深）：bg/grid 会内联进 index.html 的 <style>、game.js、cover.svg。
+ * 切真模型后这些字段由模型可控 → 只放行安全 CSS 颜色（#hex / rgb()/rgba() 数值形式），
+ * 非法（含 `</style><script>`、`"/>` 等注入）一律回退默认，绝不让任意串进入 HTML/SVG/JS 字面量。
+ */
+function safeColor(v: string | undefined, fallback: string): string {
+  const s = (v ?? "").trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(s)) return s;
+  if (/^rgba?\(\s*[\d.\s,%/]+\)$/i.test(s)) return s;
+  return fallback;
+}
+
 function indexHtml(spec: GameSpec): string {
-  const bg = spec.engine?.bg ?? "#0c0a14";
+  const bg = safeColor(spec.engine?.bg, "#0c0a14");
   return `<!doctype html>
 <html lang="zh">
   <head>
@@ -189,7 +201,13 @@ const ENGINE = String.raw`(function () {
  * （仅由输入决定 → 保红线③：无 Date.now/random），避免对 `spec.engine` 的非空断言崩 CODER。
  */
 function resolveEngine(spec: GameSpec): EngineTuning {
-  if (spec.engine) return spec.engine;
+  // bg/grid 经颜色守卫（流入 game.js 的 ctx.fillStyle/strokeStyle）；其余字段是数值，Zod 已约束。
+  if (spec.engine)
+    return {
+      ...spec.engine,
+      bg: safeColor(spec.engine.bg, "#0c0a14"),
+      grid: safeColor(spec.engine.grid, "rgba(124,92,255,0.10)"),
+    };
   const rng = new Rng(`engine:${spec.title}|${spec.genre}|${spec.theme}`);
   const byGenre: Record<string, EngineTuning["mode"]> = {
     collector: "catch",
@@ -262,8 +280,8 @@ function coverSvg(spec: GameSpec): string {
   const a = spec.palette[0];
   const b = spec.palette[1] ?? a;
   const c = spec.palette[2] ?? b;
-  const bg = spec.engine?.bg ?? "#0c0a14";
-  const grid = spec.engine?.grid ?? "rgba(124,92,255,0.12)";
+  const bg = safeColor(spec.engine?.bg, "#0c0a14");
+  const grid = safeColor(spec.engine?.grid, "rgba(124,92,255,0.12)");
   const mode = spec.engine?.mode ?? "dodge";
   let lines = "";
   for (let x = 24; x < 300; x += 28) lines += `<line x1="${x}" y1="0" x2="${x}" y2="400" stroke="${grid}" stroke-width="1"/>`;

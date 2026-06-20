@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
+import { RemoteImg } from "@/components/ui/RemoteImg";
 
 /** 顶栏右侧账号区（server component）：头像（→「我的」）+ 登出（server action）；未登录 登录/注册。 */
 export async function UserMenu() {
@@ -21,8 +22,7 @@ export async function UserMenu() {
           className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-grad-create text-[13px] font-bold text-[color:var(--grad-create-fg)] shadow-[inset_0_1px_0_rgba(255,255,255,.3)] transition-transform hover:scale-105"
         >
           {me?.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={me.avatarUrl} alt={label} className="h-full w-full object-cover" />
+            <RemoteImg src={me.avatarUrl} alt={label} className="h-full w-full object-cover" fallback={<>{initial}</>} />
           ) : (
             initial
           )}

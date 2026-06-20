@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { presignPut, publicUrl } from "@/lib/storage";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { extFor, isAllowedUploadType } from "@/lib/contracts/uploads";
+import { rateLimitPresign } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,14 @@ export async function POST(req: Request) {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const userId = gate.user.id;
+
+  const rl = await rateLimitPresign(userId);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      errorEnvelope("RATE_LIMITED", "操作过于频繁，请稍后再试", { retryAfterSec: rl.retryAfterSec }),
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
 
   let body: unknown;
   try {
@@ -48,7 +57,7 @@ export async function POST(req: Request) {
 
   const ext = extFor(filename, contentType);
   const key = `profile/${userId}/${kind}-${randomUUID()}.${ext}`;
-  const putUrl = await presignPut(key, contentType, EXPIRES_IN);
+  const putUrl = await presignPut(key, contentType, EXPIRES_IN, bytes); // 绑 content-length → 限额不可绕过
 
   return NextResponse.json({ kind, key, putUrl, publicUrl: publicUrl(key), expiresIn: EXPIRES_IN });
 }

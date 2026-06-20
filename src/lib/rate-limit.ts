@@ -50,3 +50,13 @@ export function rateLimitPlayEvents(clientKey: string): Promise<RateLimitResult>
     env.RATE_LIMIT_WINDOW_SEC,
   );
 }
+
+/** 未认证写库+加密端点（POST /api/auth/register）——按 IP 限流，挡 bcrypt 放大 DoS + 无限建号。 */
+export function rateLimitAuth(ipKey: string): Promise<RateLimitResult> {
+  return checkRateLimit(`ratelimit:auth:${ipKey}`, 10, env.RATE_LIMIT_WINDOW_SEC);
+}
+
+/** 预签名端点（POST /api/uploads/presign · /api/profile/image）——按用户限流，挡占位 Asset 行膨胀。 */
+export function rateLimitPresign(userId: string): Promise<RateLimitResult> {
+  return checkRateLimit(`ratelimit:presign:${userId}`, 30, env.RATE_LIMIT_WINDOW_SEC);
+}

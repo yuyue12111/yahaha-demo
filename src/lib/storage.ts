@@ -137,15 +137,27 @@ export function presignGet(key: string, expiresIn = 300): Promise<string> {
  * (never through the app, docs/07 §2). Presigned against the PUBLIC endpoint so the URL the
  * browser receives is actually reachable from the browser (dual-endpoint: the in-network
  * `minio:9000` host would 502 from a laptop). ContentType is bound into the signature.
+ *
+ * `contentLength` (when given) is bound into the signature too: the browser's PUT must send
+ * exactly this Content-Length (fetch sets it from the body size automatically). A client that
+ * under-reports `bytes` to slip past the server-side size check then can only upload that many
+ * bytes — a larger body fails signature/length match at MinIO. Closes the MAX_UPLOAD_BYTES
+ * bypass (docs/07 §2) without routing bytes through the app (红线①).
  */
 export function presignPut(
   key: string,
   contentType: string,
   expiresIn = 300,
+  contentLength?: number,
 ): Promise<string> {
   return getSignedUrl(
     s3public,
-    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ContentType: contentType,
+      ...(contentLength != null ? { ContentLength: contentLength } : {}),
+    }),
     { expiresIn },
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
+import { RemoteImg } from "@/components/ui/RemoteImg";
 import { BookmarkButton } from "./BookmarkButton";
 
 /**
@@ -45,11 +46,11 @@ export function GameCard({
     <div className="group block">
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset shadow-[0_8px_20px_-12px_rgba(0,0,0,.6)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(.2,.7,.2,1)] group-hover:-translate-y-1.5 group-hover:shadow-[0_14px_36px_-8px_rgba(192,59,255,.5)]">
         {game.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 跨域 MinIO 封面，刻意不用 next/image
-          <img
+          <RemoteImg
             src={game.coverUrl}
             alt={game.title}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            fallback={<div className="h-full w-full" style={{ background: coverFallback(game.id) }} aria-hidden />}
           />
         ) : (
           <div className="h-full w-full" style={{ background: coverFallback(game.id) }} aria-hidden />

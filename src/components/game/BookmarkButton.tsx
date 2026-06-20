@@ -32,6 +32,13 @@ export function BookmarkButton({
     setFav(!fav);
     try {
       const res = await fetch(`/api/games/${gameId}/favorite`, { method: "POST" });
+      if (res.status === 401) {
+        // 会话过期 → 别静默回滚，引导重新登录（回到当前页）。
+        setFav(prev);
+        const next = encodeURIComponent(window.location.pathname + window.location.search);
+        router.push(`/login?next=${next}`);
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       const d = (await res.json()) as { favorited: boolean };
       setFav(d.favorited);

@@ -6,7 +6,12 @@ import { listGamesByAuthor, listFavoriteGames, getFavoriteIds } from "@/lib/game
 import { GameCard } from "@/components/game/GameCard";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
 import { Button } from "@/components/ui/Button";
+import { RemoteImg } from "@/components/ui/RemoteImg";
 import { YForkLogo } from "@/components/brand/Logo";
+
+// 默认背景板渐变（也作上传背景失效时的兜底）。
+const BANNER_BG =
+  "radial-gradient(80% 140% at 15% 0%, rgba(192,59,255,.45), transparent 60%), radial-gradient(70% 130% at 85% 10%, rgba(39,224,255,.35), transparent 60%), linear-gradient(120deg,#1a1330,#100c18)";
 import { ProfileActions } from "@/components/profile/ProfileActions";
 import { ProfileImageUpload } from "@/components/profile/ProfileImageUpload";
 
@@ -56,16 +61,14 @@ export default async function MePage({
         {/* 背景板（用户可换） */}
         <div className="relative h-36 sm:h-44">
           {user?.bannerUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.bannerUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div
-              className="h-full w-full"
-              style={{
-                background:
-                  "radial-gradient(80% 140% at 15% 0%, rgba(192,59,255,.45), transparent 60%), radial-gradient(70% 130% at 85% 10%, rgba(39,224,255,.35), transparent 60%), linear-gradient(120deg,#1a1330,#100c18)",
-              }}
+            <RemoteImg
+              src={user.bannerUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              fallback={<div className="h-full w-full" style={{ background: BANNER_BG }} />}
             />
+          ) : (
+            <div className="h-full w-full" style={{ background: BANNER_BG }} />
           )}
           <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(180deg,transparent 45%,rgba(22,18,31,.9))" }} />
           <ProfileImageUpload
@@ -86,8 +89,16 @@ export default async function MePage({
             {/* 头像（覆盖背景板）+ 上传相机 */}
             <div className="relative -mt-12 shrink-0 sm:-mt-14">
               {user?.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatarUrl} alt={name} className="h-24 w-24 rounded-full border-4 border-surface object-cover shadow-modal" />
+                <RemoteImg
+                  src={user.avatarUrl}
+                  alt={name}
+                  className="h-24 w-24 rounded-full border-4 border-surface object-cover shadow-modal"
+                  fallback={
+                    <span className="grid h-24 w-24 place-items-center rounded-full border-4 border-surface bg-grad-create text-[34px] font-extrabold text-[color:var(--grad-create-fg)] shadow-modal">
+                      {initial}
+                    </span>
+                  }
+                />
               ) : (
                 <span className="grid h-24 w-24 place-items-center rounded-full border-4 border-surface bg-grad-create text-[34px] font-extrabold text-[color:var(--grad-create-fg)] shadow-modal">
                   {initial}
