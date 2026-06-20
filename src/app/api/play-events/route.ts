@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { PlayEventRequest, PlayEventResponse } from "@/lib/contracts/play-events";
+import { rateLimitPlayEvents } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +12,24 @@ export const dynamic = "force-dynamic";
  * POST /api/play-events（docs/06 §postMessage + docs/08 §可观测）—— Play 运行时埋点回写。
  * 公开（游玩无需登录）。type=LOAD 时 Game.playCount 自增（一次加载 = 一次游玩）。
  * userId 若有 session 则附带（best-effort；PlayEvent.userId 无 FK，stale 会话也不会 500）。
+ * 公开计数器 → 按 (session uid | client IP) 节流，防 curl 刷 playCount（docs/07 §5，fail-open）。
  */
 export async function POST(req: Request) {
+  // 节流（A2）：先定位调用方再限流，超额 429（绝不因 Redis 挂而拒服务 → fail-open）。
+  const session = await auth().catch(() => null);
+  const userId = session?.user?.id ?? null;
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anon";
+  const rl = await rateLimitPlayEvents(userId ?? `ip:${ip}`);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      errorEnvelope("RATE_LIMITED", "埋点过于频繁", { retryAfterSec: rl.retryAfterSec }),
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -43,10 +60,7 @@ export async function POST(req: Request) {
     safeVersionId = v?.id ?? null;
   }
 
-  // userId 可选（无 FK）：有 session 就附带，便于后续按用户聚合；无需存在性校验。
-  const session = await auth().catch(() => null);
-  const userId = session?.user?.id ?? null;
-
+  // userId 取自上方 session（可选，无 FK）：有 session 就附带，便于后续按用户聚合。
   await prisma.playEvent.create({
     data: { gameId, versionId: safeVersionId, userId, type, score, durationMs },
   });

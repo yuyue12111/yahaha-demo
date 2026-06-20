@@ -73,7 +73,7 @@ docker compose up --build
 - 浏览/检索：Home 搜索（标题/简介）+ 可点标签筛选 + 最新/最热排序 + 游标分页；`GET /api/games/:id` 详情（meta + 作者 + 活跃版本 + 统计）。
 - 运行时埋点：Play 回写 `PlayEvent`（LOAD/END/ERROR）→ `playCount` 自增（LOAD）；Create run-timeline 聚合并展示生成成本（6 节点 token）。
 - 版本管理：作者在自己游戏的 Play 页「＋ 新版本」→ `/create?gameId=` 生成 `versionNumber+1`，发布即切换 active 版本。
-- 安全增强：per-user 任务频率限额（Redis 固定窗口，429，fail-open）。
+- 安全增强：per-user 任务频率限额 + 公开埋点 `/api/play-events` 节流（Redis 固定窗口，429，fail-open）；失效会话存在性再校验（401 而非 500）；详情页非作者不可见草稿（404）。
 - 可复现：一条 `docker compose up` 冷启动出 ≥3 已发布游戏（含 1 个 Create 真产出）。
 
 **Mock / 设计占位**

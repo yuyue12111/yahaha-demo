@@ -41,3 +41,12 @@ export async function checkRateLimit(
 export function rateLimitCreateTask(userId: string): Promise<RateLimitResult> {
   return checkRateLimit(`ratelimit:tasks:${userId}`, env.RATE_LIMIT_TASKS, env.RATE_LIMIT_WINDOW_SEC);
 }
+
+/** 公开埋点端点限额（POST /api/play-events）——按 (session uid | client IP) 防刷 playCount。 */
+export function rateLimitPlayEvents(clientKey: string): Promise<RateLimitResult> {
+  return checkRateLimit(
+    `ratelimit:playevents:${clientKey}`,
+    env.RATE_LIMIT_PLAY_EVENTS,
+    env.RATE_LIMIT_WINDOW_SEC,
+  );
+}

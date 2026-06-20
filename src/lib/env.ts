@@ -48,6 +48,7 @@ const EnvSchema = z.object({
   // ---- per-user 速率限额（docs/07 §5）：固定窗口，Redis 计数 ----
   RATE_LIMIT_TASKS: intDefault(10), // 每窗口最多新建任务数
   RATE_LIMIT_WINDOW_SEC: intDefault(60),
+  RATE_LIMIT_PLAY_EVENTS: intDefault(30), // 每窗口每 (uid|IP) 最多 play-event 数（防刷 playCount）
 });
 
 export const env = EnvSchema.parse({
@@ -74,4 +75,5 @@ export const env = EnvSchema.parse({
 
   RATE_LIMIT_TASKS: process.env.RATE_LIMIT_TASKS,
   RATE_LIMIT_WINDOW_SEC: process.env.RATE_LIMIT_WINDOW_SEC,
+  RATE_LIMIT_PLAY_EVENTS: process.env.RATE_LIMIT_PLAY_EVENTS,
 });

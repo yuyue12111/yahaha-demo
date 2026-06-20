@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { GameDetail } from "@/lib/contracts/games";
@@ -24,6 +25,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!game) {
     return NextResponse.json(errorEnvelope("NOT_FOUND", "游戏不存在"), { status: 404 });
+  }
+
+  // 非作者不可见草稿/归档（不枚举）：PUBLISHED 对所有人公开；DRAFT/ARCHIVED 仅作者本人，否则 404。
+  if (game.status !== "PUBLISHED") {
+    const session = await auth().catch(() => null);
+    if (session?.user?.id !== game.author.id) {
+      return NextResponse.json(errorEnvelope("NOT_FOUND", "游戏不存在"), { status: 404 });
+    }
   }
 
   return NextResponse.json(
