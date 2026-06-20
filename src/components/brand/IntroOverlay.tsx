@@ -245,7 +245,7 @@ export function IntroOverlay() {
       {/* wordmark + tagline */}
       <div className="pointer-events-none absolute left-0 right-0 top-[63%] text-center">
         <div className="text-[clamp(28px,4.4vw,46px)] font-extrabold leading-none tracking-[0.04em]">
-          {["Y", "a", "H", "a", "H", "a"].map((ch, i) => (
+          {["Y", "a", "h", "a", "h", "a"].map((ch, i) => (
             <span
               key={i}
               className="inline-block transition-[opacity,transform] duration-700 ease-[cubic-bezier(.2,.7,.2,1)]"
@@ -265,7 +265,7 @@ export function IntroOverlay() {
           className="mt-4 text-[14.5px] tracking-[0.02em] text-ink-muted transition-opacity duration-700"
           style={{ transitionDelay: "0.6s", opacity: wordmark ? 1 : 0 }}
         >
-          把一个想法，跑成一个可玩的世界
+          从一句话，到一个可玩的世界
         </div>
       </div>
       {/* skip */}

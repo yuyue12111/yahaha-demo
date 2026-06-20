@@ -135,8 +135,9 @@
 }
 @keyframes yh-orbit { to { transform: rotate(360deg); } }
 @keyframes yh-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
-.yh-breathe { animation: yh-breathe 9s ease-in-out infinite; }
-.yh-orbit { animation: yh-orbit 46s linear infinite; }
+/* will-change → 各自独立合成层：scale/rotate 走 GPU 合成，不每帧重绘邻层（perf） */
+.yh-breathe { animation: yh-breathe 9s ease-in-out infinite; will-change: transform; }
+.yh-orbit { animation: yh-orbit 46s linear infinite; will-change: transform; }
 .yh-rise { animation: yh-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) {
   .yh-breathe, .yh-orbit { animation: none; }

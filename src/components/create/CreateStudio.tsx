@@ -297,7 +297,7 @@ export function CreateStudio({
       >
         <div
           className={
-            "flex items-end gap-2.5 rounded-[15px] bg-[#0e0b18]/92 backdrop-blur-md " +
+            "flex items-end gap-2.5 rounded-[15px] bg-[#0e0b18]/95 " +
             (hero ? "p-2.5 pl-3" : "p-2 pl-2.5")
           }
         >
@@ -566,7 +566,6 @@ export function CreateStudio({
           style={{
             background:
               "radial-gradient(closest-side, rgba(39,224,255,.13), rgba(192,59,255,.085) 46%, transparent 72%)",
-            filter: "blur(6px)",
           }}
         />
         <div
@@ -586,7 +585,7 @@ export function CreateStudio({
         /* ─────────────── 空状态：居中沉浸 hero（输入框为主角）─────────────── */
         <section className="relative z-10 flex min-h-[calc(100svh-4rem)] flex-col items-center justify-center px-5 py-14">
           <div className="yh-rise w-full max-w-[680px] text-center">
-            <div className="mb-7 inline-flex items-center gap-2 rounded-pill border border-hairline-brand bg-surface/50 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted backdrop-blur">
+            <div className="mb-7 inline-flex items-center gap-2 rounded-pill border border-hairline-brand bg-surface/80 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--running)" }} />
               AI 原生游戏生成
             </div>
@@ -595,14 +594,14 @@ export function CreateStudio({
             </div>
             <h1 className="text-[clamp(30px,5vw,52px)] font-extrabold leading-[1.05] tracking-tight text-ink">
               把点子交给{" "}
-              <span className="bg-grad-create bg-clip-text text-transparent">YaHaHa</span>
+              <span className="bg-grad-create bg-clip-text text-transparent">Yahaha</span>
             </h1>
             <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-relaxed text-ink-muted">
               从一句话，到一个可玩的世界 —— 六个 Agent 接力，几十秒生成、即刻游玩。
             </p>
             <div className="mt-9">{composer(true)}</div>
             {regen ? (
-              <div className="mx-auto mt-5 max-w-[640px] rounded-lg border border-hairline-brand bg-surface-inset/80 px-4 py-2.5 text-[13px] text-ink-muted backdrop-blur">
+              <div className="mx-auto mt-5 max-w-[640px] rounded-lg border border-hairline-brand bg-surface-inset/90 px-4 py-2.5 text-[13px] text-ink-muted">
                 正在为《<span className="font-medium text-ink">{regen.title}</span>》生成新版本（v+1）
               </div>
             ) : (
@@ -613,7 +612,7 @@ export function CreateStudio({
                     key={ex.label}
                     type="button"
                     onClick={() => setPrompt(ex.prompt)}
-                    className="rounded-pill border border-hairline bg-surface/40 px-3.5 py-1.5 text-[12.5px] text-ink-muted backdrop-blur transition-colors hover:border-hairline-brand hover:text-ink"
+                    className="rounded-pill border border-hairline bg-surface/70 px-3.5 py-1.5 text-[12.5px] text-ink-muted transition-colors hover:border-hairline-brand hover:text-ink"
                   >
                     {ex.label}
                   </button>

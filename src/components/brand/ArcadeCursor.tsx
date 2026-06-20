@@ -27,7 +27,14 @@ export function ArcadeCursor() {
     const fine = window.matchMedia("(pointer: fine)").matches;
     const canHover = window.matchMedia("(hover: hover)").matches;
     if (!fine || !canHover) return; // 触屏 / 无鼠标：保持系统光标
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // a11y：动效敏感 / 高对比 / 强制色（Win 高对比）用户保留系统（含放大）光标，不接管
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(prefers-contrast: more)").matches ||
+      window.matchMedia("(forced-colors: active)").matches
+    ) {
+      return;
+    }
 
     const ring = ringRef.current;
     const dot = dotRef.current;
@@ -43,6 +50,10 @@ export function ArcadeCursor() {
     let ry = ty;
     let visible = false;
     let raf = 0;
+    // 命中检测节流：仅当 e.target 变化才跑 closest；仅当结果变化才写 class
+    let lastTarget: Element | null = null;
+    let lastIsText = false;
+    let lastIsInteractive = false;
 
     const show = () => {
       if (visible) return;
@@ -63,18 +74,28 @@ export function ArcadeCursor() {
       tx = e.clientX;
       ty = e.clientY;
       const p = `translate3d(${tx}px, ${ty}px, 0)`;
-      dot.style.transform = p;
+      dot.style.transform = p; // 精准点即时跟随
       text.style.transform = p;
-      if (reduce) ring.style.transform = p;
       show();
 
+      // closest 较贵且命中极少变化 → 只在 target 变化时检测、结果变化时才写 class
       const el = e.target as Element | null;
-      const isText = !!el?.closest?.(TEXTUAL);
-      const isInteractive = !isText && !!el?.closest?.(INTERACTIVE);
-      ring.classList.toggle("is-text", isText);
-      ring.classList.toggle("is-hover", isInteractive);
-      dot.classList.toggle("is-text", isText);
-      text.classList.toggle("is-text", isText);
+      if (el !== lastTarget) {
+        lastTarget = el;
+        const isText = !!el?.closest?.(TEXTUAL);
+        const isInteractive = !isText && !!el?.closest?.(INTERACTIVE);
+        if (isText !== lastIsText) {
+          ring.classList.toggle("is-text", isText);
+          dot.classList.toggle("is-text", isText);
+          text.classList.toggle("is-text", isText);
+          lastIsText = isText;
+        }
+        if (isInteractive !== lastIsInteractive) {
+          ring.classList.toggle("is-hover", isInteractive);
+          lastIsInteractive = isInteractive;
+        }
+      }
+      if (!raf) raf = requestAnimationFrame(loop); // 静止后已停 → 重新点火
     };
     const onDown = () => ring.classList.add("is-down");
     const onUp = () => ring.classList.remove("is-down");
@@ -90,13 +111,20 @@ export function ArcadeCursor() {
     };
 
     const loop = () => {
-      const k = reduce ? 1 : 0.3;
-      rx += (tx - rx) * k;
-      ry += (ty - ry) * k;
+      rx += (tx - rx) * 0.3;
+      ry += (ty - ry) * 0.3;
+      // 收敛到目标 → snap 并停 rAF（静止时 0 帧，省掉空闲 60fps 空转）
+      if (Math.abs(tx - rx) < 0.1 && Math.abs(ty - ry) < 0.1) {
+        rx = tx;
+        ry = ty;
+        ring.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+        raf = 0;
+        return;
+      }
       ring.style.transform = `translate3d(${rx}px, ${ry}px, 0)`;
       raf = requestAnimationFrame(loop);
     };
-    if (!reduce) raf = requestAnimationFrame(loop);
+    raf = requestAnimationFrame(loop);
 
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onDown, { passive: true });
