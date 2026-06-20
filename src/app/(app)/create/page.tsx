@@ -25,9 +25,6 @@ export default async function CreatePage({
     if (g && g.authorId === session.user.id) regen = { gameId: g.id, title: g.title };
   }
 
-  return (
-    <div className="mx-auto max-w-5xl">
-      <CreateStudio regen={regen} />
-    </div>
-  );
+  // 满铺：CreateStudio 自管沉浸式布局（抵消 main 内边距 + 居中 hero），不再外套窄容器。
+  return <CreateStudio regen={regen} />;
 }

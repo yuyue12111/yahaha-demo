@@ -125,3 +125,75 @@
   .yh-floaty, .yh-dotpulse, .yh-aura, .yh-reveal { animation: none; }
   .yh-sheen::after { animation: none; opacity: 0; }
 }
+
+/* ============================================================================
+   Create 沉浸式氛围（moonshot 式整体性）—— 缓慢呼吸的月食/极光辉光，呼应入场动画。
+   ========================================================================= */
+@keyframes yh-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+@keyframes yh-orbit { to { transform: rotate(360deg); } }
+@keyframes yh-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+.yh-breathe { animation: yh-breathe 9s ease-in-out infinite; }
+.yh-orbit { animation: yh-orbit 46s linear infinite; }
+.yh-rise { animation: yh-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .yh-breathe, .yh-orbit { animation: none; }
+  .yh-rise { animation: none; }
+}
+
+/* ============================================================================
+   街机指针（arcade cursor）—— 霓虹瞄准镜 reticle + 精准中心点。
+   仅在 ArcadeCursor 判定为细指针设备时给 <html> 加 .yh-cursor-active（隐藏原生光标）。
+   光标层 pointer-events:none，永不挡交互；cursor:none 不会穿入跨域 iframe（红线② 内仍用原生光标）。
+   ========================================================================= */
+html.yh-cursor-active,
+html.yh-cursor-active * { cursor: none !important; }
+
+.yh-cur {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  will-change: transform;
+}
+.yh-cur-ring .yh-cur-reticle {
+  display: block;
+  margin: -17px 0 0 -17px; /* 34px reticle 居中对准指针 */
+  color: var(--running); /* 默认青 */
+  transition: color 0.18s ease, transform 0.13s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.2s ease;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 75%, transparent));
+}
+.yh-cur-ring .yh-cur-reticle svg { display: block; animation: yh-orbit 7s linear infinite; }
+.yh-cur-ring.is-hover .yh-cur-reticle { color: var(--brand-purple, #c03bff); transform: scale(1.45); }
+.yh-cur-ring.is-down .yh-cur-reticle { transform: scale(0.78); }
+.yh-cur-ring.is-hover.is-down .yh-cur-reticle { transform: scale(1.18); }
+.yh-cur-ring.is-text .yh-cur-reticle { opacity: 0; }
+.yh-cur-dot.is-text { opacity: 0; }
+.yh-cur-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
+  transition: opacity 0.2s ease, transform 0.13s ease;
+}
+.yh-cur-text {
+  width: 2px;
+  height: 22px;
+  margin: -11px 0 0 -1px;
+  border-radius: 2px;
+  background: var(--running);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--running) 80%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.yh-cur-ring.is-text ~ .yh-cur-text,
+.yh-cur-text.is-text { opacity: 1; }
+.yh-cur.is-hidden { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .yh-cur-ring .yh-cur-reticle svg { animation: none; }
+}
