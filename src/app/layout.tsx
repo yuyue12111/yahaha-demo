@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { BrandDefs } from "@/components/brand/Logo";
 
 // Vendored (next/font/local) → no build-time network; --font-sans drives the Tailwind sans stack.
 const jakarta = localFont({
@@ -22,7 +23,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" className={jakarta.variable}>
-      <body className="min-h-screen bg-bg font-sans text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-bg font-sans text-ink antialiased">
+        <BrandDefs />
+        {children}
+      </body>
     </html>
   );
 }

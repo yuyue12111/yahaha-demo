@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Brand } from "@/components/brand/StarLogo";
+import { Brand } from "@/components/brand/Logo";
 import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
