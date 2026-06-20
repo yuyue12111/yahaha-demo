@@ -6,6 +6,21 @@ import type { ChatInput, ChatResult, ModelClient, VisionInput, VisionResult } fr
  * 仅在配置了 MODEL_BASE_URL + MODEL_API_KEY 时被选中（见 index.ts）；否则退化为 mock。
  * 结构化输出走 JSON mode + schema 校验；校验失败抛出 → 节点内有限修复重试（docs/04/08）。
  */
+/** 宽容解析模型 JSON 输出：剥 ```json 围栏 / 退化为首个 {...} 片段（真实模型偶尔加围栏或前后缀）。 */
+function parseJsonLenient(s: string): unknown {
+  const t = s.trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fence ? fence[1] : t).trim();
+  try {
+    return JSON.parse(body);
+  } catch {
+    const a = body.indexOf("{");
+    const b = body.lastIndexOf("}");
+    if (a >= 0 && b > a) return JSON.parse(body.slice(a, b + 1));
+    throw new Error("model output has no parseable JSON object");
+  }
+}
+
 export class OpenAICompatibleClient implements ModelClient {
   readonly provider: string;
   constructor(provider: string) {
@@ -50,7 +65,7 @@ export class OpenAICompatibleClient implements ModelClient {
     const { content, tokensIn, tokensOut } = await this.call(body);
 
     if (input.schema) {
-      const object = input.schema.parse(JSON.parse(content)) as T; // 抛 → 节点修复重试
+      const object = input.schema.parse(parseJsonLenient(content)) as T; // 抛 → 节点修复重试
       return { object, tokensIn, tokensOut };
     }
     return { text: content, tokensIn, tokensOut };
