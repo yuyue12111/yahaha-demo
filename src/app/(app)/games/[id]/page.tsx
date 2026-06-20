@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { resolveActiveVersion } from "@/lib/active-version";
 import { Button } from "@/components/ui/Button";
+import { RemoteImg } from "@/components/ui/RemoteImg";
 import { GameManagePanel } from "@/components/game/GameManagePanel";
 
 // 单游戏详情页（T3）：承载玩法提示（T1）+ 统计 + 立即游玩 + 作者管理面板（T2-1）。
@@ -48,8 +49,12 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         {/* 封面 */}
         <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-hairline-brand bg-surface-inset">
           {game.coverUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- 跨域 MinIO 封面
-            <img src={game.coverUrl} alt={game.title} className="h-full w-full object-cover" />
+            <RemoteImg
+              src={game.coverUrl}
+              alt={game.title}
+              className="h-full w-full object-cover"
+              fallback={<div className="h-full w-full bg-grad-play opacity-30" aria-hidden />}
+            />
           ) : (
             <div className="h-full w-full bg-grad-play opacity-30" aria-hidden />
           )}

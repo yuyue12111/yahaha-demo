@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { presignGet, presignPut } from "@/lib/storage";
 import { errorEnvelope } from "@/lib/contracts/error";
 import { PresignRequest, PresignResponse, extFor, isAllowedUploadType } from "@/lib/contracts/uploads";
+import { rateLimitPresign } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,15 @@ export async function POST(req: Request) {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const userId = gate.user.id;
+
+  // per-user 限流（fail-open）：挡循环建占位 Asset 行膨胀。
+  const rl = await rateLimitPresign(userId);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      errorEnvelope("RATE_LIMITED", "操作过于频繁，请稍后再试", { retryAfterSec: rl.retryAfterSec }),
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
 
   let body: unknown;
   try {
@@ -69,7 +79,7 @@ export async function POST(req: Request) {
   await prisma.asset.update({ where: { id: asset.id }, data: { s3Key: key } });
 
   const [putUrl, getUrl] = await Promise.all([
-    presignPut(key, contentType, EXPIRES_IN),
+    presignPut(key, contentType, EXPIRES_IN, bytes), // 绑 content-length → 限额不可绕过
     presignGet(key, EXPIRES_IN),
   ]);
 

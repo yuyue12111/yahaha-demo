@@ -4,10 +4,24 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { RegisterSchema } from "@/lib/contracts/auth";
 import { errorEnvelope } from "@/lib/contracts/error";
+import { rateLimitAuth } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // 按 IP 限流（fail-open）：挡 bcrypt 放大 DoS + 无限建号。先于 JSON 解析与 bcrypt。
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anon";
+  const rl = await rateLimitAuth(`ip:${ip}`);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      errorEnvelope("RATE_LIMITED", "注册过于频繁，请稍后再试", { retryAfterSec: rl.retryAfterSec }),
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
