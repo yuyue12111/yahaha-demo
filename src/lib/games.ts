@@ -59,9 +59,76 @@ export async function listPublishedGames(
   return { items, nextCursor: hasMore ? page[page.length - 1].id : undefined };
 }
 
+/** Home 三排（参考稿 Astrocade 式）：玩家之选 / Trending / 为你推荐，都从真实数据派生。 */
+
+/** 玩家之选 = 累计游玩数最高（真实 playCount）。 */
+export async function listPopularGames(limit = 12): Promise<GameCard[]> {
+  const { items } = await listPublishedGames({ sort: "popular", limit });
+  return items;
+}
+
 /**
- * 已发布游戏的去重标签 + 计数（Home 分类筛选 pill 行的真实数据源，
- * 替代参考稿里写死的「动作/解谜/街机…」）。按出现次数降序，名称升序兜底。
+ * Trending = 近 7 天「增长最快」：按最近 LOAD 事件数降序（真实 PlayEvent），playCount 兜底。
+ * 真实「增长速度」信号，而非写死。
+ */
+export async function listTrendingGames(limit = 12): Promise<GameCard[]> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [{ items }, recent] = await Promise.all([
+    listPublishedGames({ limit: 60 }),
+    prisma.playEvent.groupBy({
+      by: ["gameId"],
+      where: { type: "LOAD", createdAt: { gte: since } },
+      _count: { gameId: true },
+    }),
+  ]);
+  const recentMap = new Map(recent.map((r) => [r.gameId, r._count.gameId]));
+  return [...items]
+    .sort((a, b) => (recentMap.get(b.id) ?? 0) - (recentMap.get(a.id) ?? 0) || b.playCount - a.playCount)
+    .slice(0, limit);
+}
+
+/**
+ * 为你推荐 = 确定性打散（按 id 稳定 hash 排序，区别于热门/趋势两排的次序）。
+ * 无个性化推荐引擎时的诚实占位：一个稳定、可复现、与其它两排不同的次序。
+ */
+export async function listRecommendedGames(limit = 12): Promise<GameCard[]> {
+  const { items } = await listPublishedGames({ limit: 60 });
+  const hash = (s: string) => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h >>> 0;
+  };
+  return [...items].sort((a, b) => hash(a.id) - hash(b.id)).slice(0, limit);
+}
+
+/** 「我的」页：当前用户的已发布作品 + 草稿数 + 累计游玩（真实，作者维度）。 */
+export async function listGamesByAuthor(
+  authorId: string,
+): Promise<{ published: GameCard[]; draftCount: number; totalPlays: number }> {
+  const rows = await prisma.game.findMany({
+    where: { authorId },
+    include: { author: { select: { id: true, displayName: true } } },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+  });
+  const published: GameCard[] = rows
+    .filter((g) => g.status === "PUBLISHED")
+    .map((g) => ({
+      id: g.id,
+      title: g.title,
+      summary: g.summary,
+      coverUrl: g.coverUrl,
+      tags: g.tags,
+      author: { id: g.author.id, displayName: g.author.displayName },
+      publishedAt: g.publishedAt ? g.publishedAt.toISOString() : null,
+      playCount: g.playCount,
+    }));
+  const draftCount = rows.filter((g) => g.status !== "PUBLISHED").length;
+  const totalPlays = rows.reduce((acc, g) => acc + g.playCount, 0);
+  return { published, draftCount, totalPlays };
+}
+
+/**
+ * 已发布游戏的去重标签 + 计数（标签筛选 / 详情用）。按出现次数降序，名称升序兜底。
  */
 export async function listPublishedTags(limit = 8): Promise<{ tag: string; count: number }[]> {
   const rows = await prisma.game.findMany({

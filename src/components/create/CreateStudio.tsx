@@ -302,16 +302,13 @@ export function CreateStudio({
               <div className="mx-auto mb-4 w-fit">
                 <YForkLogo size={54} float />
               </div>
-              <div className="text-[19px] font-extrabold tracking-tight text-ink">把点子交给流水线</div>
-              <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-ink-muted">
-                用一句话描述你的游戏创意。提交后由独立 worker 异步跑 6 节点流水线，每一步都会在这条对话里实时呈现。
-              </p>
+              <div className="text-[20px] font-extrabold tracking-tight text-ink">把点子交给 YaHaHa</div>
               {regen ? (
                 <div className="mt-4 rounded-lg border border-hairline-brand bg-surface-inset px-3 py-2 text-left text-[12px] text-ink-muted">
                   正在为《<span className="font-medium text-ink">{regen.title}</span>》生成新版本（v+1）
                 </div>
               ) : (
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {EXAMPLES.map((ex) => (
                     <button
                       key={ex.label}

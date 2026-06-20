@@ -1,13 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Brand } from "@/components/brand/Logo";
+import { YForkLogo } from "@/components/brand/Logo";
 
 /**
- * 侧栏（参考稿 Home mock §sidebar）：Y-fork 品牌 + 洋红「▶ Play」主胶囊 +
- * 图标导航（选中 = surface-2 + r-md）+ 底部账号区。只列真实目的地（发现/创作/最热）。
+ * 侧栏（参考稿 Astrocade）：醒目 Y-fork 品牌 + 大「创作」主胶囊 + 大号图标导航，
+ * 选中 = surface-2 圆角底。可点击收起/展开（localStorage 记忆），宽度+标签平滑过渡。
+ * 导航只列真实可点目的地（发现/排行/我的）。「我的」= /me 作品页（真实，受保护）。
  */
 type NavItem = {
   href: string;
@@ -22,7 +24,7 @@ const NAV: NavItem[] = [
     label: "发现",
     match: (p, q) => p === "/" && q.get("sort") !== "popular",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <polygon points="15.5 8.5 13 13 8.5 15.5 11 11" />
       </svg>
@@ -30,64 +32,143 @@ const NAV: NavItem[] = [
   },
   {
     href: "/?sort=popular",
-    label: "最热",
+    label: "排行",
     match: (p, q) => p === "/" && q.get("sort") === "popular",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 20v-6M12 20V6M18 20v-9" />
       </svg>
     ),
   },
   {
-    href: "/create",
-    label: "创作",
-    match: (p) => p.startsWith("/create"),
+    href: "/me",
+    label: "我的",
+    match: (p) => p === "/me" || p.startsWith("/me/"),
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="3.6" />
+        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
       </svg>
     ),
   },
 ];
 
-export function Sidebar({ account }: { account?: ReactNode }) {
+const COOKIE = "yahaha-sidebar-collapsed";
+
+export function Sidebar({ initialCollapsed = false }: { initialCollapsed?: boolean }) {
   const pathname = usePathname();
   const params = useSearchParams();
+  // 初值：SSR 用服务端读到的 cookie（initialCollapsed）→ 客户端首渲染读最新 cookie，二者同源 → 无水合不一致。
+  // 客户端重挂载（导航后）也读最新 cookie → 状态不丢。
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof document === "undefined") return initialCollapsed;
+    try {
+      return document.cookie.split("; ").some((c) => c === `${COOKIE}=1`);
+    } catch {
+      return initialCollapsed;
+    }
+  });
+  // ready 仅用于「首渲染不带过渡，之后切换才动画」。
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        document.cookie = `${COOKIE}=${next ? "1" : "0"};path=/;max-age=31536000;samesite=lax`;
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+
   return (
-    <aside className="sticky top-0 hidden h-screen w-[224px] shrink-0 flex-col gap-5 border-r border-hairline bg-surface px-4 py-6 md:flex">
-      <Link href="/" className="px-1">
-        <Brand size={30} />
+    <aside
+      className="sticky top-0 hidden h-screen shrink-0 flex-col gap-4 overflow-hidden border-r border-hairline bg-surface px-3.5 py-5 md:flex"
+      style={{
+        width: collapsed ? 78 : 244,
+        transition: ready ? "width .32s cubic-bezier(.4,0,.2,1)" : undefined,
+      }}
+    >
+      {/* 品牌 */}
+      <Link href="/" className="flex h-10 items-center gap-2.5 px-1" title="Yahaha">
+        <YForkLogo size={38} />
+        <span
+          className="text-[21px] font-extrabold tracking-tight text-ink transition-opacity duration-200"
+          style={{ opacity: collapsed ? 0 : 1 }}
+        >
+          Yahaha
+        </span>
       </Link>
 
-      {/* 主操作（参考稿洋红 Play 胶囊）→ 发现/游玩 hub */}
+      {/* 主操作 = 创作（平台核心）。create 渐变=创作旅程语义。 */}
       <Link
-        href="/"
-        className="flex h-11 items-center justify-center gap-2 rounded-pill bg-grad-play text-[14px] font-bold text-white shadow-[0_8px_20px_-8px_rgba(192,59,255,.5),inset_0_1px_0_rgba(255,255,255,.22)] transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
+        href="/create"
+        title="创作"
+        className="flex h-12 items-center justify-center gap-2 rounded-pill bg-grad-create font-bold text-[color:var(--grad-create-fg)] shadow-[0_8px_22px_-8px_rgba(39,224,255,.6),inset_0_1px_0_rgba(255,255,255,.4)] transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
       >
-        ▶ Play
+        <span className="text-[18px] leading-none">✦</span>
+        <span
+          className="whitespace-nowrap text-[16px] transition-opacity duration-200"
+          style={{ opacity: collapsed ? 0 : 1, width: collapsed ? 0 : "auto" }}
+        >
+          创作
+        </span>
       </Link>
 
-      <nav className="flex flex-col gap-1">
+      <div className="mx-1 h-px bg-hairline" />
+
+      <nav className="flex flex-col gap-1.5">
         {NAV.map((it) => {
           const active = it.match(pathname, params);
           return (
             <Link
               key={it.label}
               href={it.href}
+              title={it.label}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                active ? "bg-surface-2 text-ink" : "text-ink-muted hover:text-ink"
+              className={`flex h-12 items-center gap-3.5 rounded-lg px-3.5 font-bold transition-colors ${
+                active ? "bg-surface-2 text-ink" : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
               }`}
             >
-              <span className="shrink-0 text-current">{it.icon}</span>
-              {it.label}
+              <span className="grid w-[22px] shrink-0 place-items-center text-current">{it.icon}</span>
+              <span
+                className="whitespace-nowrap text-[16px] transition-opacity duration-200"
+                style={{ opacity: collapsed ? 0 : 1 }}
+              >
+                {it.label}
+              </span>
             </Link>
           );
         })}
       </nav>
 
-      {/* 底部账号区（登录态名 + 登出 / 未登录 登录注册），server 注入 */}
-      <div className="mt-auto border-t border-hairline pt-4">{account}</div>
+      {/* 收起 / 展开 */}
+      <button
+        type="button"
+        onClick={toggle}
+        title={collapsed ? "展开侧栏" : "收起侧栏"}
+        aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+        className="mt-auto flex h-10 items-center gap-3.5 rounded-lg px-3.5 text-ink-faint transition-colors hover:bg-surface-2/60 hover:text-ink"
+      >
+        <span className="grid w-[22px] shrink-0 place-items-center">
+          <svg
+            width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className="transition-transform duration-300"
+            style={{ transform: collapsed ? "rotate(180deg)" : "none" }}
+            aria-hidden
+          >
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </span>
+        <span
+          className="whitespace-nowrap text-[14px] font-medium transition-opacity duration-200"
+          style={{ opacity: collapsed ? 0 : 1 }}
+        >
+          收起
+        </span>
+      </button>
     </aside>
   );
 }

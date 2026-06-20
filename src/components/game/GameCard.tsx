@@ -2,12 +2,11 @@ import Link from "next/link";
 import type { GameCard as GameCardData } from "@/lib/contracts/games";
 
 /**
- * 游戏卡（docs/10:63 §Game card + docs/00:33 / 02 / 03 的六项契约）：
- * 竖版 3:4 封面满铺 + border-brand，左下 play-count 徽章；卡下六项 ——
- * 标题 · 简介(截断) · 标签(可点 → /?tag=) · 作者行(头像+名) · 发布时间。
+ * 游戏卡（参考稿 Astrocade 式，简洁版）：竖版 3:4 封面满铺 + 左下 play-count 徽章；
+ * 卡下标题 + 作者行（头像 + 名）。按用户反馈去掉标签/简介/时间（完整字段见详情页 /games/[id]）。
  * 封面是 MinIO `:9000` 跨域图（img-src 未被站点 CSP 限）。
- * 注：外层不是单一 <a>（标签是独立 link，避免嵌套 anchor）；封面+标题为 Play 链接。
  */
+
 // 无封面时的程序化渐变占位（参考稿彩色卡片观感）；按 id 确定性取色，异游戏异渐变。
 const COVER_FALLBACKS = [
   "linear-gradient(150deg,#C03BFF,#3B82F6)",
@@ -21,10 +20,14 @@ function coverFallback(id: string): string {
   return COVER_FALLBACKS[Math.abs(h) % COVER_FALLBACKS.length];
 }
 
+function formatPlays(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
+}
+
 export function GameCard({ game }: { game: GameCardData }) {
   const initial = game.author.displayName.trim().charAt(0).toUpperCase() || "?";
-  // 确定性格式化（纯字符串切片，避免 toLocaleDateString 的 server/client 水合不一致）
-  const publishedDate = game.publishedAt ? game.publishedAt.slice(0, 10) : null;
 
   return (
     <div className="group block">
@@ -41,7 +44,7 @@ export function GameCard({ game }: { game: GameCardData }) {
             <div className="h-full w-full" style={{ background: coverFallback(game.id) }} aria-hidden />
           )}
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-            ▶ {game.playCount}
+            ▶ {formatPlays(game.playCount)}
           </span>
         </div>
 
@@ -50,39 +53,14 @@ export function GameCard({ game }: { game: GameCardData }) {
         </h3>
       </Link>
 
-      {game.summary ? (
-        <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-ink-muted">{game.summary}</p>
-      ) : null}
-
-      {game.tags.length > 0 ? (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {game.tags.slice(0, 3).map((t) => (
-            <Link
-              key={t}
-              href={`/?tag=${encodeURIComponent(t)}`}
-              className="rounded-pill border border-hairline px-2 py-0.5 text-[11px] text-ink-muted transition-colors hover:border-hairline-strong hover:text-ink"
-            >
-              {t}
-            </Link>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-medium text-ink-muted"
-            aria-hidden
-          >
-            {initial}
-          </span>
-          <span className="truncate text-[13px] text-ink-muted">{game.author.displayName}</span>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <span
+          className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-medium text-ink-muted"
+          aria-hidden
+        >
+          {initial}
         </span>
-        {publishedDate ? (
-          <time className="shrink-0 text-[11px] text-ink-faint" dateTime={game.publishedAt ?? undefined}>
-            {publishedDate}
-          </time>
-        ) : null}
+        <span className="truncate text-[13px] text-ink-muted">{game.author.displayName}</span>
       </div>
     </div>
   );
