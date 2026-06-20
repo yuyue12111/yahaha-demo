@@ -9,7 +9,7 @@
 - **产物 CSP**：manifest 自带 `connect-src 'none'`，阻断游戏外联/数据外泄；`default-src 'none'` 收紧默认。
 - **服务端从不执行生成代码**：worker 只做静态校验/打包，可选 headless 渲染在受限无网容器内（截图用）。
 - **postMessage 校验**：宿主按 **`event.source` 身份**（= 所挂 iframe 的 `contentWindow`）+ **先 Zod 校验外层信封**（`source:"yahaha-game"`、`v:1`）再 switch type；sandbox 帧 origin 为 `"null"`，**绝不**按 origin 断言。详见 `06`。
-- **站点级 CSP（已实现）**：`next.config.ts` `headers()` 下发 `frame-src 'self' <S3_PUBLIC_ENDPOINT>; frame-ancestors 'none'`（源走 env），限制可嵌入 iframe 的源为 MinIO 产物源，并禁止本站被他人内嵌。
+- **站点级 CSP + 安全 headers（已实现）**：`next.config.ts` `headers()` 下发 `frame-src 'self' <S3_PUBLIC_ENDPOINT>; frame-ancestors 'none'`（源走 env，限制可嵌入 iframe 的源为 MinIO 产物源、禁本站被内嵌），并附 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`（禁用 camera/mic/geo/payment）。均不影响游戏 iframe（frame-src 已显式允 MinIO）。
 
 ## 2. 上传素材
 
@@ -37,8 +37,8 @@
 - `MAX_UPLOAD_BYTES`（上传）、`MAX_BUNDLE_BYTES`（产物体积上限，VALIDATOR 拦截）、`GENERATION_TIMEOUT_MS`（任务看护）、`MAX_AGENT_RETRIES`（节点重试）。
 - BullMQ 并发上限防止 worker 过载；任务超时置 `FAILED` 防卡 `RUNNING`。
 - 〔已实现〕**per-user 速率限额**（`src/lib/rate-limit.ts`，Redis 固定窗口）：新建生成任务 `POST /api/tasks` 限 `RATE_LIMIT_TASKS`/`RATE_LIMIT_WINDOW_SEC`，超额 **429 `RATE_LIMITED` + `Retry-After`**；公开埋点 `POST /api/play-events` 按 (session uid | client IP) 限 `RATE_LIMIT_PLAY_EVENTS` 防刷 `playCount`。Redis 不可用时 **fail-open**（限额是防滥用增强，绝不拖垮正常用户）。
-- 〔已实现〕**成本统计**：6 节点 token 计入 `AgentLog`（确定性节点恒 0），Create run-timeline 聚合并展示每节点 + 总量（mock 估算）。
-- 〔设计/未实现〕内容审核（content moderation）为加分项，仅设计。
+- 〔已实现〕**成本统计**：6 节点 token 计入 `AgentLog`（确定性节点恒 0）。Create run-timeline 展示每节点 + 总量；`/me?tab=tasks` 生成记录展示每任务 token + **估算美元成本**（`COST_USD_PER_1K_TOKENS`，默认 0.01/1k）及本页累计（mock token 为估算值）。
+- 〔已实现，B4〕**内容审核**（content moderation）：`src/lib/moderation.ts` 本地启发式禁词（性暴露/极端暴力/武器毒品制造/仇恨，中英），生成前在 `POST /api/tasks` 拦截命中创意 → **422 不建任务不入队**。是可插拔 seam：内部换真实审核 API（OpenAI moderation/自建分类器）即升级，调用点与契约不变。无 key 离线可跑（红线⑤）。
 
 ## 6. 鉴权与越权
 
@@ -66,5 +66,7 @@
 | 任务超时/重试 | 已实现 |
 | 失效会话存在性再校验（`requireUser` → 401 非 500） | 已实现 |
 | per-user 速率限额（任务 + play-events，Redis 固定窗口，fail-open） | 已实现 |
-| 成本统计（6 节点 token 聚合 + run-timeline 展示） | 已实现 |
-| Prompt Injection 深防御 / 内容审核 | 设计（已知问题） |
+| 成本统计（6 节点 token 聚合 + run-timeline + /me 任务记录估算成本） | 已实现 |
+| 内容审核（本地启发式禁词 seam，生成前 422 拦截，可插真审核 API） | 已实现（B4） |
+| 站点安全 headers（CSP frame-src + nosniff/x-frame-options/referrer/permissions） | 已实现（B4） |
+| Prompt Injection 深防御（提示注入语义级防护） | 设计（已知问题） |
