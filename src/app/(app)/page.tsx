@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listPublishedGames, type GamesSort } from "@/lib/games";
+import { listPublishedGames, listPublishedTags, type GamesSort } from "@/lib/games";
 import { GameCard } from "@/components/game/GameCard";
 
 // 查库渲染（非写死数组）；force-dynamic 避免 build 期触 DB。
@@ -15,9 +15,12 @@ export default async function HomePage({
   const tag = sp.tag?.trim() || undefined;
   const sort: GamesSort = sp.sort === "popular" ? "popular" : "newest";
 
-  const { items: games } = await listPublishedGames({ search, tag, sort });
+  const [{ items: games }, tags] = await Promise.all([
+    listPublishedGames({ search, tag, sort }),
+    listPublishedTags(),
+  ]);
 
-  // 构造保留当前筛选的 URL（用于排序切换 / 清除 chip）。
+  // 构造保留当前筛选的 URL（用于排序切换 / 标签 / 清除）。
   const hrefWith = (next: { search?: string; tag?: string; sort?: GamesSort }) => {
     const p = new URLSearchParams();
     if (next.search) p.set("search", next.search);
@@ -33,7 +36,7 @@ export default async function HomePage({
       <Link
         href={hrefWith({ search, tag, sort: key })}
         aria-current={active ? "page" : undefined}
-        className={`rounded-pill px-3.5 py-1.5 text-[13px] transition-colors ${
+        className={`rounded-pill px-3 py-1.5 text-[13px] transition-colors ${
           active ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
         }`}
       >
@@ -42,22 +45,19 @@ export default async function HomePage({
     );
   };
 
+  const sectionTitle = search
+    ? `“${search}” 的结果`
+    : tag
+      ? `#${tag}`
+      : sort === "popular"
+        ? "最热门"
+        : "为你精选";
+
   return (
     <div className="mx-auto max-w-6xl">
-      {/* hero */}
-      <div className="relative mb-6">
-        <div
-          className="pointer-events-none absolute -top-10 left-0 h-40 w-80 opacity-60"
-          style={{ background: "radial-gradient(60% 60% at 30% 0%, rgba(124,92,255,.16), transparent 70%)" }}
-          aria-hidden
-        />
-        <h1 className="relative text-[26px] font-extrabold tracking-tight text-ink">发现游戏</h1>
-        <p className="relative mt-1 text-sm text-ink-muted">社区发布的 AI 互动游戏，点击即玩。</p>
-      </div>
-
-      {/* 搜索 + 排序（GET 表单 → RSC 重渲染，无需客户端 JS）。 */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <form method="get" className="relative w-full sm:max-w-sm">
+      {/* 顶部行：搜索 + 排序切换（GET 表单 → RSC 重渲染，无需客户端 JS） */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <form method="get" className="relative w-full sm:flex-1">
           <svg
             className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
             width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -70,9 +70,9 @@ export default async function HomePage({
             type="search"
             name="search"
             defaultValue={search ?? ""}
-            placeholder="搜索游戏标题或简介…"
+            placeholder="搜索游戏、作者、标签…"
             aria-label="搜索游戏"
-            className="h-10 w-full rounded-lg border border-hairline bg-surface-inset pl-10 pr-3 text-sm text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.02)] outline-none placeholder:text-ink-faint focus:border-hairline-strong"
+            className="h-11 w-full rounded-md border border-hairline bg-surface pl-10 pr-3 text-sm text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.025)] outline-none placeholder:text-ink-faint focus:border-hairline-strong"
           />
           {tag ? <input type="hidden" name="tag" value={tag} /> : null}
           {sort === "popular" ? <input type="hidden" name="sort" value="popular" /> : null}
@@ -83,34 +83,40 @@ export default async function HomePage({
         </div>
       </div>
 
-      {/* 生效中的筛选 chip（可清除）。 */}
-      {search || tag ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-[12px]">
-          {search ? (
-            <span className="inline-flex items-center gap-1.5 rounded-pill border border-hairline bg-surface-inset px-2.5 py-1 text-ink-muted">
-              搜索：{search}
-              <Link href={hrefWith({ tag, sort })} aria-label="清除搜索" className="text-ink-faint hover:text-danger">
-                ✕
+      {/* 分类筛选 pill 行（真实去重标签，替代写死分类）。 */}
+      {tags.length > 0 ? (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <Link
+            href={hrefWith({ search, sort })}
+            aria-current={!tag ? "page" : undefined}
+            className={`rounded-pill px-3.5 py-1.5 text-[13px] transition-colors ${
+              !tag ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+            }`}
+          >
+            全部
+          </Link>
+          {tags.map(({ tag: t }) => {
+            const active = tag === t;
+            return (
+              <Link
+                key={t}
+                href={hrefWith({ search, tag: t, sort })}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-pill px-3.5 py-1.5 text-[13px] transition-colors ${
+                  active ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                }`}
+              >
+                {t}
               </Link>
-            </span>
-          ) : null}
-          {tag ? (
-            <span className="inline-flex items-center gap-1.5 rounded-pill border border-hairline bg-surface-inset px-2.5 py-1 text-ink-muted">
-              标签：{tag}
-              <Link href={hrefWith({ search, sort })} aria-label="清除标签" className="text-ink-faint hover:text-danger">
-                ✕
-              </Link>
-            </span>
-          ) : null}
+            );
+          })}
         </div>
       ) : null}
 
-      {/* section heading */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[16px] font-extrabold text-ink">
-          {search || tag ? "筛选结果" : sort === "popular" ? "最热门" : "最新发布"}
-        </h2>
-        <span className="font-mono text-[11px] text-ink-faint">{games.length} 款</span>
+      {/* 区块标题 + 数量 */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="truncate text-[18px] font-extrabold text-ink">{sectionTitle}</h2>
+        <span className="shrink-0 font-mono text-[11px] text-ink-faint">{games.length} 款</span>
       </div>
 
       {games.length === 0 ? (
@@ -134,7 +140,7 @@ export default async function HomePage({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {games.map((g) => (
             <GameCard key={g.id} game={g} />
           ))}
