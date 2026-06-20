@@ -42,9 +42,9 @@ export default async function MePage({
   const handle = handleFrom(name);
   const favSet = new Set(favoriteIds);
 
-  // Plays 真实；Followers/Following 暂无社交系统 → 0（待社交功能）。
+  // Plays 真实；Followers/Following 暂无社交系统 → 0（待社交功能）。三者统一显示数字，避免 —/0 混排。
   const stats: { label: string; value: string }[] = [
-    { label: "Plays", value: totalPlays > 0 ? String(totalPlays) : "—" },
+    { label: "Plays", value: String(totalPlays) },
     { label: "Followers", value: "0" },
     { label: "Following", value: "0" },
   ];
@@ -126,17 +126,17 @@ export default async function MePage({
       {/* tabs */}
       <div className="mb-6 mt-6 flex gap-2">
         <TabLink href="/me" active={tab === "favorites"}>
-          Favorites
+          收藏
         </TabLink>
         <TabLink href="/me?tab=created" active={tab === "created"}>
-          Created
+          作品
         </TabLink>
       </div>
 
       {/* content */}
       {tab === "favorites" ? (
         favorites.length === 0 ? (
-          <EmptyState title="No favorited games" desc="Games you love will appear here. Tap the bookmark icon on the ones you like!" />
+          <EmptyState title="还没有收藏的游戏" desc="喜欢的游戏点卡片上的书签收藏，就会出现在这里。" />
         ) : (
           <Grid games={favorites} favSet={favSet} refreshOnToggle />
         )
@@ -188,7 +188,7 @@ function EmptyState({ title, desc }: { title: string; desc: string }) {
       <h3 className="mt-6 text-[22px] font-extrabold text-ink">{title}</h3>
       <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-muted">{desc}</p>
       <Button href="/" variant="primary" size="lg" className="mt-7">
-        Discover Games
+        去发现游戏
       </Button>
     </div>
   );

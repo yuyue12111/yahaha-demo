@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { SearchHotkey } from "@/components/layout/SearchHotkey";
 import { Brand } from "@/components/brand/Logo";
 
 /**
@@ -23,6 +24,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar initialCollapsed={collapsed} />
       </Suspense>
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* ⌘K/Ctrl+K → 聚焦全局搜索（让顶栏角标名副其实） */}
+        <SearchHotkey />
         {/* 桌面顶栏：全局搜索（GET → Home 发现）+ 通知 + 账号 */}
         <header
           className="sticky top-0 z-20 hidden h-16 shrink-0 items-center gap-3 border-b border-hairline px-8 backdrop-blur md:flex"
@@ -38,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <path d="M21 21l-4-4" />
             </svg>
             <input
+              id="global-search"
               type="search"
               name="search"
               placeholder="搜索游戏、作者、标签…"
@@ -50,9 +54,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
           <button
             type="button"
-            title="通知（敬请期待）"
-            aria-label="通知"
-            className="grid h-11 w-11 shrink-0 cursor-default place-items-center rounded-lg border border-hairline text-ink-muted"
+            disabled
+            title="通知 · 暂未接入"
+            aria-label="通知（暂未接入）"
+            className="grid h-11 w-11 shrink-0 cursor-not-allowed place-items-center rounded-lg border border-hairline text-ink-muted opacity-50"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
