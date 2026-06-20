@@ -92,7 +92,7 @@ export function Sidebar({ initialCollapsed = false }: { initialCollapsed?: boole
       }}
     >
       {/* 品牌 */}
-      <Link href="/" className="flex h-11 items-center gap-2.5 px-1" title="Yahaha">
+      <Link href="/" className="flex h-11 items-center gap-2.5 px-1" title="Yahaha" data-dock-target>
         <YForkLogo size={40} />
         <span className="transition-opacity duration-200" style={{ opacity: collapsed ? 0 : 1 }}>
           <PixelWordmark height={19} />

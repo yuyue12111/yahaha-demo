@@ -8,24 +8,6 @@ import { useEffect, useRef } from "react";
  * canvas 绘制（替换原 SVG 版）；保持 <YForkLogo size float> 接口不变（drop-in，所有调用点无需改）。
  */
 
-// 渐变 def 历史保留（根布局渲染一次；像素 logo 不再引用，留作兼容不删，避免改动其他文件）。
-export function BrandDefs() {
-  return (
-    <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
-      <defs>
-        <linearGradient id="yh-gPlay" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#FF3BA7" />
-          <stop offset="1" stopColor="#C03BFF" />
-        </linearGradient>
-        <linearGradient id="yh-gCreate" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#27E0FF" />
-          <stop offset="1" stopColor="#3B82F6" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
-
 // ── 像素 Y-fork 绘制核心（与 Pixel Logo 参考稿一致） ──────────────────────────
 const BAYER = [
   [0, 8, 2, 10],

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { BrandDefs } from "@/components/brand/Logo";
 import { IntroOverlay } from "@/components/brand/IntroOverlay";
 import { ArcadeCursor } from "@/components/brand/ArcadeCursor";
 
@@ -26,7 +25,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN" className={jakarta.variable}>
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
-        <BrandDefs />
         {children}
         {/* 入场动画（每会话一次，盖在真 app 上播完淡出；reduced-motion 跳过） */}
         <IntroOverlay />

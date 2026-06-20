@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PixelWordmark } from "./Logo";
 
 /**
- * 入场动画（参考稿 `Yahaha Pixel Intro`）：街机点阵场上，~?? 个像素从四周飞入、沿三段汇聚拼成
- * **像素霓虹 Y-fork**（左臂洋红 / 右臂青 / 主干紫 / 中心白热），点亮后霓虹 bloom + CRT 扫描线脉冲；
- * 「LOADING YAHAHA」字样淡出 → 覆盖层淡出，露出底下真实 app（其侧栏 logo 即同款像素 Y，视觉连贯）。
+ * 入场动画（参考稿 `Yahaha Pixel Intro`）：街机点阵场上像素从四周飞入、沿三段拼成像素霓虹 Y-fork，
+ * 点亮后「YAHAHA」字标浮现 → **整个 lockup 飞向首页左上角侧栏 logo 的位置（dock）**，同时黑场淡出，
+ * 露出底下真实 app。侧栏那枚 logo 即同款像素 Y、位置一致 → 无缝交接。
  *
- * 落地差异：作为 fixed inset-0 覆盖层盖在真 app 上，播完淡出卸载。每会话一次（sessionStorage）、
- * `prefers-reduced-motion` 直接跳过、Skip 按钮。纯 canvas 2D，无依赖、离线安全，对红线零影响（纯展示）。
+ * dock 目标 = 侧栏品牌 lockup（`[data-dock-target]`，带重试测量）。测不到（移动端侧栏隐藏）退化为居中淡出。
+ * 飞行用 rAF 直接驱动 transform（不依赖 CSS transition，规避 toggle 不触发的坑）。
+ * 每会话一次（sessionStorage）、`prefers-reduced-motion` 跳过、SKIP。纯 canvas 2D，离线安全，红线零影响。
  */
 
 const SEEN_KEY = "yahaha-intro-seen";
 const N = 18;
+const SCALE = 3.6;
+const DOCK_MS = 1050;
 
 const BAYER = [
   [0, 8, 2, 10],
@@ -37,19 +41,23 @@ function segDist(px: number, py: number, a: [number, number], b: [number, number
 }
 
 type Pix = { tx: number; ty: number; col: string; sx: number; sy: number };
+type Dock = { tx: number; ty: number };
 
 export function IntroOverlay() {
-  const [gone, setGone] = useState(false); // 完全卸载
-  const [revealing, setRevealing] = useState(false); // 淡出露出 app
-  const [lit, setLit] = useState(false); // LOADING 字样淡出
+  const [gone, setGone] = useState(false);
+  const [revealing, setRevealing] = useState(false); // 黑场淡出
+  const [lit, setLit] = useState(false); // 字标浮现 / LOADING 淡出
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lockupRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const kickRef = useRef<number | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t0Ref = useRef(0);
   const ipRef = useRef<Pix[] | null>(null);
   const cwRef = useRef(0);
+  const dockRef = useRef<Dock | null>(null);
+  const dockStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     const reduce =
@@ -70,6 +78,8 @@ export function IntroOverlay() {
       /* private mode — still play once */
     }
 
+    const ease = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : 1 - Math.pow(1 - t, 3));
+
     const stop = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (kickRef.current) cancelAnimationFrame(kickRef.current);
@@ -78,8 +88,6 @@ export function IntroOverlay() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-
-    const ease = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : 1 - Math.pow(1 - t, 3));
 
     const initIP = (W: number, H: number) => {
       const cw = W / N;
@@ -190,35 +198,70 @@ export function IntroOverlay() {
     };
 
     const loop = () => {
-      const el = (performance.now() - t0Ref.current) / 1000;
+      const now = performance.now();
+      const el2 = (now - t0Ref.current) / 1000;
       const c = canvasRef.current;
-      if (c) drawIntro(c, el);
-      if (el < 7.5) rafRef.current = requestAnimationFrame(loop);
+      if (c) drawIntro(c, el2);
+      // dock 飞行：rAF 插值 transform（centered+大 → 侧栏 identity），无 CSS transition 依赖。
+      const lk = lockupRef.current,
+        dk = dockRef.current;
+      if (lk && dk) {
+        const p = dockStartRef.current == null ? 0 : ease(Math.min(1, (now - dockStartRef.current) / DOCK_MS));
+        lk.style.transform = `translate(${dk.tx * (1 - p)}px,${dk.ty * (1 - p)}px) scale(${1 + (SCALE - 1) * (1 - p)})`;
+      }
+      if (el2 < 7.5) rafRef.current = requestAnimationFrame(loop);
       else rafRef.current = null;
     };
 
     const begin = () => {
-      const c = canvasRef.current;
-      if (!c || c.clientWidth === 0) {
+      const c = canvasRef.current,
+        lk = lockupRef.current;
+      if (!c || !lk) {
         kickRef.current = requestAnimationFrame(begin);
         return;
       }
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      c.width = Math.round(c.clientWidth * dpr);
-      c.height = Math.round(c.clientHeight * dpr);
+      c.width = 240;
+      c.height = 240;
       ipRef.current = null;
+      // 初始：居中放大（dock 未测到也是这个；测到后 measureDock 改 left/top，loop 用 dk 居中 transform）
+      lk.style.left = "50%";
+      lk.style.top = "44%";
+      lk.style.transformOrigin = "center";
+      lk.style.transform = `translate(-50%,-50%) scale(${SCALE})`;
       t0Ref.current = performance.now();
       loop();
     };
     begin();
 
-    timersRef.current.push(setTimeout(() => setLit(true), 2100));
-    timersRef.current.push(setTimeout(() => setRevealing(true), 3300));
+    timersRef.current.push(setTimeout(() => setLit(true), 1800));
+    timersRef.current.push(
+      setTimeout(() => {
+        // 起飞：dock 到侧栏 lockup 的左上角。测真实 [data-dock-target]（此时多半已布局）；
+        // 测不到（仍在流式/Suspense）则用侧栏布局常量兜底。lockup 自身尺寸用于居中（它在覆盖层里，恒已布局）。
+        const lk = lockupRef.current;
+        if (!lk || window.innerWidth < 768) return; // 移动端无侧栏 → 不 dock，居中淡出
+        const el = document.querySelector("[data-dock-target]") as HTMLElement | null;
+        const r = el?.getBoundingClientRect();
+        const tl = r && r.width > 2 ? r.left : 18; // 兜底：aside px-3.5(14) + link px-1(4)
+        const tt = r && r.height > 2 ? r.top : 24; // 兜底：aside py-6(24)
+        const lkW = lk.offsetWidth,
+          lkH = lk.offsetHeight;
+        const tx = Math.round(window.innerWidth / 2 - (tl + lkW / 2));
+        const ty = Math.round(window.innerHeight * 0.44 - (tt + lkH / 2));
+        lk.style.left = tl + "px";
+        lk.style.top = tt + "px";
+        lk.style.transformOrigin = "center";
+        lk.style.transform = `translate(${tx}px,${ty}px) scale(${SCALE})`; // p=0：仍居中，避免 1 帧错位
+        dockRef.current = { tx, ty };
+        dockStartRef.current = performance.now();
+      }, 2600),
+    );
+    timersRef.current.push(setTimeout(() => setRevealing(true), 3750)); // 落位后淡出黑场 → 不双 logo
     timersRef.current.push(
       setTimeout(() => {
         stop();
         setGone(true);
-      }, 4300),
+      }, 4800),
     );
 
     return stop;
@@ -237,34 +280,27 @@ export function IntroOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] overflow-hidden transition-opacity duration-[800ms] ease-out"
-      style={{
-        background: "#08050F",
-        opacity: revealing ? 0 : 1,
-        pointerEvents: revealing ? "none" : "auto",
-      }}
+      className="fixed inset-0 z-[100] overflow-hidden"
+      style={{ pointerEvents: revealing ? "none" : "auto" }}
       role="presentation"
     >
-      {/* 街机点阵场 + CRT 横扫 + 中心辉光（参考稿 overlay） */}
+      {/* 街机点阵黑场（dock 落位后淡出露出 app）；lockup 不在此层 → 飞行保持实色，卸载即无缝交接。 */}
       <div
-        className="pointer-events-none absolute inset-0"
-        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px)", backgroundSize: "5px 5px" }}
+        className="absolute inset-0 transition-opacity duration-[1000ms] ease-out"
+        style={{ background: "#08050F", opacity: revealing ? 0 : 1 }}
         aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "repeating-linear-gradient(0deg,rgba(5,3,10,.5) 0,rgba(5,3,10,.5) 1.4px,transparent 1.4px,transparent 3px)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(120% 110% at 50% 47%,rgba(124,92,255,.12),transparent 60%)" }}
-        aria-hidden
-      />
+      >
+        <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px)", backgroundSize: "5px 5px" }} />
+        <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(0deg,rgba(5,3,10,.5) 0,rgba(5,3,10,.5) 1.4px,transparent 1.4px,transparent 3px)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(120% 110% at 50% 47%,rgba(124,92,255,.12),transparent 60%)" }} />
+      </div>
 
-      {/* 像素 Y 拼合 canvas（居中，逻辑 47% 高与粒子汇聚锚点一致） */}
-      <div className="pointer-events-none absolute left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2" aria-hidden>
-        <canvas ref={canvasRef} className="block h-[min(58vw,260px)] w-[min(58vw,260px)]" style={{ imageRendering: "pixelated" }} />
+      {/* lockup：像素 Y canvas + YAHAHA 字标（与侧栏品牌同布局/同尺寸；transform 由 rAF 驱动） */}
+      <div ref={lockupRef} className="absolute z-[60] flex items-center gap-2.5" aria-hidden>
+        <canvas ref={canvasRef} style={{ width: 40, height: 40, display: "block", imageRendering: "pixelated" }} />
+        <span style={{ opacity: lit ? 1 : 0, transition: "opacity .45s ease" }}>
+          <PixelWordmark height={19} />
+        </span>
       </div>
 
       {/* LOADING 字样 */}
@@ -281,7 +317,8 @@ export function IntroOverlay() {
         type="button"
         onClick={skip}
         aria-label="跳过入场动画"
-        className="absolute right-6 top-5 z-[6] rounded-pill border border-hairline-strong bg-white/[0.04] px-4 py-2 font-mono text-[11px] tracking-[0.05em] text-ink-muted backdrop-blur transition-colors hover:bg-white/10 hover:text-ink"
+        className="absolute right-6 top-5 z-[80] rounded-pill border border-hairline-strong bg-white/[0.04] px-4 py-2 font-mono text-[11px] tracking-[0.05em] text-ink-muted backdrop-blur transition-opacity duration-500 hover:bg-white/10 hover:text-ink"
+        style={{ opacity: revealing ? 0 : 1 }}
       >
         SKIP ▸
       </button>
