@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { YForkLogo } from "@/components/brand/Logo";
 import type { AgentLogDTO, AgentName, TaskStatus, TaskDoneData } from "@/lib/contracts/tasks";
 import { PreviewPane } from "./PreviewPane";
 
@@ -13,6 +14,12 @@ const NODES: { name: AgentName; label: string; desc: string }[] = [
   { name: "CODER", label: "Coder", desc: "生成可玩 bundle" },
   { name: "VALIDATOR", label: "Validator", desc: "静态校验产物" },
   { name: "PACKAGER", label: "Packager", desc: "打包上传+写版本" },
+];
+
+const EXAMPLES = [
+  "一个太空主题的躲避小游戏，霓虹风格，越玩越快。",
+  "赛博朋克跑酷，自动奔跑＋跳跃躲障碍，节奏感强。",
+  "接住坠落星星的休闲小游戏，漏接三次结束。",
 ];
 
 type NodeState = "pending" | "running" | "done" | "failed";
@@ -32,6 +39,7 @@ export function CreateStudio({
   regen?: { gameId: string; title: string } | null;
 } = {}) {
   const [prompt, setPrompt] = useState("");
+  const [submittedPrompt, setSubmittedPrompt] = useState(""); // 已提交的创意 → 聊天用户气泡
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -40,6 +48,7 @@ export function CreateStudio({
   const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null);
   const [runningAgent, setRunningAgent] = useState<AgentName | null>(null);
   const [logsByAgent, setLogsByAgent] = useState<Partial<Record<AgentName, AgentLogDTO>>>({});
+  const [expanded, setExpanded] = useState<Partial<Record<AgentName, boolean>>>({});
   const [done, setDone] = useState<TaskDoneData | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
@@ -94,6 +103,7 @@ export function CreateStudio({
     setSubmitError(null);
     setDone(null);
     setLogsByAgent({});
+    setExpanded({});
     setRunningAgent(null);
     setTaskStatus("PENDING");
     setPublished(false);
@@ -166,12 +176,15 @@ export function CreateStudio({
   const submit = useCallback(async () => {
     if (!prompt.trim() || busy) return;
     resetRun();
+    setSubmittedPrompt(prompt.trim());
+    const sent = prompt.trim();
+    setPrompt("");
     try {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: sent,
           assetIds: uploads.map((u) => u.assetId),
           ...(regen ? { gameId: regen.gameId } : {}),
         }),
@@ -212,6 +225,7 @@ export function CreateStudio({
 
   const failed = taskStatus === "FAILED";
   const succeeded = taskStatus === "SUCCEEDED";
+  const hasConvo = !!taskId || submittedPrompt !== "" || failed;
 
   // B3：跨 6 节点聚合生成成本（mock 估算；确定性节点贡献 0）。
   const logVals = Object.values(logsByAgent);
@@ -221,35 +235,298 @@ export function CreateStudio({
     { in: 0, out: 0 },
   );
 
+  const doneCount = NODES.filter((n) => nodeState(n.name) === "done").length;
+  const progressPct = Math.round((doneCount / NODES.length) * 100);
+  const statusPill = !taskStatus
+    ? { text: "尚未开始", color: "var(--pending)", pulse: false }
+    : failed
+      ? { text: "失败", color: "var(--danger)", pulse: false }
+      : succeeded
+        ? { text: `完成 · ${doneCount}/6`, color: "var(--ok)", pulse: false }
+        : { text: `运行中 · ${doneCount}/6`, color: "var(--running)", pulse: true };
+  const assistantLine = failed
+    ? "生成失败 —— 下面可以看到失败的节点，修复创意后重试。"
+    : succeeded
+      ? "搞定！六个节点都通过校验、bundle 已打包。下面可直接预览，满意就发布到首页 🎮"
+      : "好的，我把这个点子跑成可玩原型。独立 worker 已异步启动 6 节点流水线，下面实时呈现 👇";
+  const ctaText = busy ? "生成中…" : succeeded || failed ? "再生成" : "生成游戏";
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      {/* 左：创意输入 */}
-      <section className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-[22px] font-bold text-ink">Create</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            描述你的游戏创意，可选附上参考图。提交后由独立 worker 异步跑 6 节点生成流水线。
-          </p>
+    <div className="mx-auto flex w-full max-w-3xl flex-col">
+      <div
+        className="flex flex-col overflow-hidden rounded-xl border border-hairline"
+        style={{
+          background: "linear-gradient(180deg,#120E1C,#0B0912)",
+          boxShadow: "0 40px 90px -34px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.05)",
+        }}
+      >
+        {/* top bar */}
+        <div
+          className="flex items-center gap-3 border-b border-hairline px-5 py-4"
+          style={{ background: "linear-gradient(180deg,rgba(255,255,255,.025),transparent)" }}
+        >
+          <YForkLogo size={32} />
+          <div className="flex-1">
+            <div className="text-[15px] font-extrabold leading-tight tracking-tight text-ink">Create</div>
+            <div className="font-mono text-[11px] tracking-wide text-ink-faint">
+              ai-worker · 6-node pipeline
+            </div>
+          </div>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-pill px-3 py-1 font-mono text-[11px]"
+            style={{ color: statusPill.color, background: `color-mix(in srgb, ${statusPill.color} 14%, transparent)` }}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${statusPill.pulse ? "yh-dotpulse" : ""}`}
+              style={{ background: statusPill.color }}
+            />
+            {statusPill.text}
+          </span>
         </div>
 
-        {regen ? (
-          <div className="rounded-lg border border-hairline-brand bg-surface-inset px-3 py-2 text-[13px] text-ink-muted">
-            在《<span className="font-medium text-ink">{regen.title}</span>》上生成新版本
-            —— 产物记为 <span className="font-mono">v+1</span>，生成后可发布切换为该游戏的 active 版本。
-          </div>
-        ) : null}
+        {/* thread */}
+        <div
+          className="flex max-h-[600px] min-h-[340px] flex-col gap-6 overflow-y-auto px-6 py-7"
+          style={{ background: "radial-gradient(120% 55% at 50% 0%, rgba(124,92,255,.06), transparent 62%)" }}
+        >
+          {!hasConvo ? (
+            <div className="m-auto max-w-md py-6 text-center">
+              <div className="mx-auto mb-4 w-fit">
+                <YForkLogo size={54} float />
+              </div>
+              <div className="text-[19px] font-extrabold tracking-tight text-ink">把点子交给流水线</div>
+              <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-ink-muted">
+                用一句话描述你的游戏创意。提交后由独立 worker 异步跑 6 节点流水线，每一步都会在这条对话里实时呈现。
+              </p>
+              {regen ? (
+                <div className="mt-4 rounded-lg border border-hairline-brand bg-surface-inset px-3 py-2 text-left text-[12px] text-ink-muted">
+                  正在为《<span className="font-medium text-ink">{regen.title}</span>》生成新版本（v+1）
+                </div>
+              ) : (
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  {EXAMPLES.map((ex) => (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => setPrompt(ex)}
+                      className="rounded-pill border border-hairline px-3.5 py-2 text-[12.5px] text-ink-muted transition-colors hover:border-hairline-brand hover:text-ink"
+                    >
+                      {ex.length > 12 ? ex.slice(0, 11) + "…" : ex}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* user bubble */}
+              {submittedPrompt ? (
+                <div
+                  className="max-w-[78%] self-end rounded-[18px_18px_6px_18px] border border-hairline-brand px-4 py-3 text-[14px] leading-snug text-ink"
+                  style={{ background: "linear-gradient(135deg,#251C3D,#1A1430)" }}
+                >
+                  {submittedPrompt}
+                </div>
+              ) : null}
 
-        <div className="rounded-lg border border-hairline bg-surface-inset p-3">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="例如：一个太空主题的躲避小游戏，霓虹风格，越玩越快…"
-            rows={5}
-            disabled={busy}
-            className="w-full resize-none bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint disabled:opacity-60"
-          />
-          <div className="mt-2 flex items-center justify-between gap-3 border-t border-hairline pt-2">
-            <label className="cursor-pointer text-[13px] text-ink-muted hover:text-ink">
+              {/* assistant: line + embedded pipeline card */}
+              <div className="flex items-start gap-3">
+                <YForkLogo size={30} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] leading-relaxed text-ink-muted">{assistantLine}</p>
+
+                  <div className="mt-3 rounded-lg border border-hairline bg-surface-inset p-4">
+                    {/* header + progress */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted">
+                        build pipeline
+                      </span>
+                      <span className="font-mono text-[11px] text-ink-faint">{doneCount} / 6</span>
+                    </div>
+                    <div className="mt-3 h-[3px] overflow-hidden rounded-pill bg-surface-2">
+                      <div
+                        className="h-full rounded-pill transition-[width] duration-500"
+                        style={{
+                          width: `${progressPct}%`,
+                          background: "var(--grad-create)",
+                          boxShadow: "0 0 10px rgba(39,224,255,.5)",
+                        }}
+                      />
+                    </div>
+                    {hasTokens ? (
+                      <div className="mt-2 font-mono text-[11px] text-ink-faint">
+                        Σ 生成成本（mock 估算）· {tokenTotal.in} in / {tokenTotal.out} out ·{" "}
+                        {tokenTotal.in + tokenTotal.out} tok
+                      </div>
+                    ) : null}
+
+                    {/* 6-node vertical timeline */}
+                    <ol className="mt-4 flex flex-col">
+                      {NODES.map((node, i) => {
+                        const st = nodeState(node.name);
+                        const log = logsByAgent[node.name];
+                        const last = i === NODES.length - 1;
+                        const open = !!expanded[node.name] || st === "running";
+                        return (
+                          <li key={node.name} className="flex gap-3">
+                            {/* badge + connector */}
+                            <div className="flex flex-col items-center">
+                              <span
+                                key={st}
+                                className={`yh-pop grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                                  st === "running" ? "animate-pulse" : ""
+                                }`}
+                                style={{
+                                  color: STATE_COLOR[st],
+                                  border: `1px solid color-mix(in srgb, ${STATE_COLOR[st]} 55%, transparent)`,
+                                  background: `color-mix(in srgb, ${STATE_COLOR[st]} 12%, transparent)`,
+                                }}
+                              >
+                                {st === "running" ? "•" : st === "done" ? "✓" : st === "failed" ? "✕" : i + 1}
+                              </span>
+                              {!last ? (
+                                <span
+                                  className="my-1 w-px flex-1"
+                                  style={{
+                                    minHeight: 14,
+                                    background:
+                                      st === "done" ? "var(--grad-create)" : "var(--border)",
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                            {/* body */}
+                            <button
+                              type="button"
+                              onClick={() => setExpanded((m) => ({ ...m, [node.name]: !m[node.name] }))}
+                              className="min-w-0 flex-1 pb-4 text-left"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[13.5px] font-semibold text-ink">{node.label}</span>
+                                <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
+                                  {st}
+                                  {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
+                                  {log && (log.tokensIn != null || log.tokensOut != null)
+                                    ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
+                                    : ""}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-[12px] text-ink-faint">{node.desc}</p>
+                              {st === "running" ? (
+                                <div className="yh-shimmer-track mt-1.5 h-0.5 w-full rounded bg-surface-2" />
+                              ) : null}
+                              {open && log?.outputSummary ? (
+                                <div
+                                  className="mt-2 rounded-md border border-hairline px-3 py-2 font-mono text-[11px] leading-relaxed"
+                                  style={{
+                                    background: "rgba(255,255,255,.018)",
+                                    color: st === "failed" ? "var(--danger)" : "var(--text-muted)",
+                                  }}
+                                >
+                                  {log.inputSummary ? (
+                                    <div className="text-ink-faint">← {log.inputSummary}</div>
+                                  ) : null}
+                                  <div>→ {log.outputSummary}</div>
+                                </div>
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+
+                    {/* done → preview + publish (real cross-origin sandbox preview) */}
+                    {succeeded && done?.entryUrl && done.runtime && done.versionNumber ? (
+                      <div className="mt-2 border-t border-hairline pt-4">
+                        <PreviewPane
+                          entryUrl={done.entryUrl}
+                          runtime={done.runtime}
+                          versionNumber={done.versionNumber}
+                        />
+                        <div className="mt-4 border-t border-hairline pt-3">
+                          {published ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[13px] font-medium" style={{ color: "var(--ok)" }}>
+                                ✓ 已发布到首页
+                              </span>
+                              <div className="flex gap-2">
+                                <Button href="/" variant="ghost" size="sm">
+                                  去首页
+                                </Button>
+                                {done.gameId ? (
+                                  <Button href={`/play/${done.gameId}`} variant="play" size="sm">
+                                    ▶ 立即游玩
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[12px] text-ink-muted">满意？发布后所有人可在首页玩到。</span>
+                              <Button variant="create" size="sm" onClick={() => void publish()} disabled={publishing}>
+                                {publishing ? "发布中…" : "发布到首页"}
+                              </Button>
+                            </div>
+                          )}
+                          {publishError ? <p className="mt-2 text-[12px] text-danger">{publishError}</p> : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* failed → retry */}
+                    {failed ? (
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-hairline pt-3">
+                        {submitError ? (
+                          <span className="min-w-0 flex-1 truncate text-[12px] text-danger">{submitError}</span>
+                        ) : (
+                          <span className="text-[12px] text-ink-muted">生成失败。</span>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => void retry()}>
+                          重试（从头重排）
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* composer */}
+        <div
+          className="border-t border-hairline px-4 py-4"
+          style={{ background: "linear-gradient(0deg,rgba(255,255,255,.015),transparent)" }}
+        >
+          {uploads.length > 0 ? (
+            <ul className="mb-2 flex flex-wrap gap-2">
+              {uploads.map((u) => (
+                <li
+                  key={u.assetId}
+                  className="inline-flex items-center gap-2 rounded-lg border border-hairline bg-surface px-2 py-1 text-[12px] text-ink-muted"
+                >
+                  {u.type.startsWith("image/") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={u.getUrl} alt="" className="h-6 w-6 rounded object-cover" />
+                  ) : (
+                    <span className="grid h-6 w-6 place-items-center rounded bg-surface-2 text-[10px]">file</span>
+                  )}
+                  <span className="max-w-[120px] truncate">{u.name}</span>
+                  {!busy ? (
+                    <button onClick={() => removeUpload(u.assetId)} className="text-ink-faint hover:text-danger" aria-label="移除">
+                      ✕
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          <div className="flex items-end gap-2.5 rounded-lg border border-hairline bg-surface-inset p-2 pl-2.5">
+            <label
+              title="附素材"
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-md border border-hairline text-[18px] leading-none text-ink-muted transition-colors hover:border-hairline-brand hover:text-ink"
+            >
               <input
                 type="file"
                 multiple
@@ -258,174 +535,39 @@ export function CreateStudio({
                 disabled={busy || uploadBusy}
                 onChange={(e) => void onFiles(e.target.files)}
               />
-              {uploadBusy ? "上传中…" : "＋ 附素材"}
+              {uploadBusy ? "…" : "＋"}
             </label>
-            <Button
-              variant="create"
-              size="md"
-              onClick={() => void submit()}
-              disabled={!prompt.trim() || busy}
-            >
-              {busy ? "生成中…" : "生成游戏"}
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+              placeholder="描述你想做的游戏…（⌘/Ctrl + Enter 发送）"
+              rows={1}
+              className="max-h-32 min-h-[36px] flex-1 resize-none self-center bg-transparent py-1.5 text-sm text-ink outline-none placeholder:text-ink-faint"
+            />
+            <Button variant="create" size="md" onClick={() => void submit()} disabled={!prompt.trim() || busy} className="shrink-0">
+              {busy ? (
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[rgba(4,34,58,.3)]"
+                    style={{ borderTopColor: "var(--grad-create-fg)" }}
+                  />
+                  {ctaText}
+                </span>
+              ) : (
+                ctaText
+              )}
             </Button>
           </div>
+          {uploadError ? <p className="mt-2 text-[12px] text-danger">{uploadError}</p> : null}
+          {submitError && !failed ? <p className="mt-2 text-[12px] text-danger">{submitError}</p> : null}
         </div>
-
-        {uploadError ? <p className="text-[12px] text-danger">{uploadError}</p> : null}
-        {uploads.length > 0 ? (
-          <ul className="flex flex-wrap gap-2">
-            {uploads.map((u) => (
-              <li
-                key={u.assetId}
-                className="inline-flex items-center gap-2 rounded-lg border border-hairline bg-surface px-2 py-1 text-[12px] text-ink-muted"
-              >
-                {u.type.startsWith("image/") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={u.getUrl} alt="" className="h-6 w-6 rounded object-cover" />
-                ) : (
-                  <span className="grid h-6 w-6 place-items-center rounded bg-surface-2 text-[10px]">
-                    file
-                  </span>
-                )}
-                <span className="max-w-[120px] truncate">{u.name}</span>
-                {!busy ? (
-                  <button
-                    onClick={() => removeUpload(u.assetId)}
-                    className="text-ink-faint hover:text-danger"
-                    aria-label="移除"
-                  >
-                    ✕
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {submitError ? <p className="text-[12px] text-danger">{submitError}</p> : null}
-        {failed ? (
-          <Button variant="ghost" size="md" onClick={() => void retry()}>
-            重试（从头重排）
-          </Button>
-        ) : null}
-      </section>
-
-      {/* 右：run-timeline + 预览 */}
-      <section className="flex flex-col gap-4">
-        <div className="rounded-lg border border-hairline bg-surface p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-ink">生成流水线</span>
-            {taskStatus ? (
-              <span className="font-mono text-[11px] text-ink-faint">
-                {taskId?.slice(0, 8)} · {taskStatus}
-              </span>
-            ) : (
-              <span className="text-[12px] text-ink-faint">尚未开始</span>
-            )}
-          </div>
-          {hasTokens ? (
-            <div className="mb-2 flex items-center justify-between rounded-md border border-hairline bg-surface-inset px-2.5 py-1.5 font-mono text-[11px] text-ink-muted">
-              <span>Σ 生成成本（mock 估算）</span>
-              <span>
-                {tokenTotal.in} in · {tokenTotal.out} out · {tokenTotal.in + tokenTotal.out} tok
-              </span>
-            </div>
-          ) : null}
-          <ol className="flex flex-col gap-2">
-            {NODES.map((node, i) => {
-              const st = nodeState(node.name);
-              const log = logsByAgent[node.name];
-              return (
-                <li
-                  key={node.name}
-                  className="flex gap-3 rounded-md border border-hairline bg-surface-inset p-2.5"
-                >
-                  <span
-                    key={st}
-                    className={`yh-pop mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${
-                      st === "running" ? "animate-pulse" : ""
-                    }`}
-                    style={{
-                      color: STATE_COLOR[st],
-                      background: `color-mix(in srgb, ${STATE_COLOR[st]} 16%, transparent)`,
-                    }}
-                  >
-                    {st === "running" ? "•" : st === "done" ? "✓" : st === "failed" ? "✕" : i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-medium text-ink">{node.label}</span>
-                      <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
-                        {st}
-                        {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
-                        {log && (log.tokensIn != null || log.tokensOut != null)
-                          ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
-                          : ""}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-ink-faint">{node.desc}</p>
-                    {st === "running" ? (
-                      <div className="yh-shimmer-track mt-1 h-0.5 w-full rounded bg-surface-2" />
-                    ) : null}
-                    {log?.outputSummary ? (
-                      <p
-                        className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px]"
-                        style={{ color: st === "failed" ? "var(--danger)" : "var(--text-muted)" }}
-                      >
-                        {log.inputSummary ? `← ${log.inputSummary}\n` : ""}→ {log.outputSummary}
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-
-        {succeeded && done?.entryUrl && done.runtime && done.versionNumber ? (
-          <div className="rounded-lg border border-hairline bg-surface p-4">
-            <PreviewPane
-              entryUrl={done.entryUrl}
-              runtime={done.runtime}
-              versionNumber={done.versionNumber}
-            />
-            <div className="mt-4 border-t border-hairline pt-3">
-              {published ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium" style={{ color: "var(--ok)" }}>
-                    ✓ 已发布到首页
-                  </span>
-                  <div className="flex gap-2">
-                    <Button href="/" variant="ghost" size="sm">
-                      去首页
-                    </Button>
-                    {done.gameId ? (
-                      <Button href={`/play/${done.gameId}`} variant="play" size="sm">
-                        立即游玩
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] text-ink-muted">满意？发布后所有人可在首页玩到。</span>
-                  <Button
-                    variant="create"
-                    size="sm"
-                    onClick={() => void publish()}
-                    disabled={publishing}
-                  >
-                    {publishing ? "发布中…" : "发布到首页"}
-                  </Button>
-                </div>
-              )}
-              {publishError ? (
-                <p className="mt-2 text-[12px] text-danger">{publishError}</p>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-      </section>
+      </div>
     </div>
   );
 }
