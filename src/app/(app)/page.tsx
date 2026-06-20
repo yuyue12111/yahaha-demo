@@ -20,7 +20,7 @@ export default async function HomePage({
     listPublishedTags(),
   ]);
 
-  // 构造保留当前筛选的 URL（用于排序切换 / 标签 / 清除）。
+  // 保留当前筛选的 URL（标签切换 / 清除 / 排序经侧栏「排行」）。
   const hrefWith = (next: { search?: string; tag?: string; sort?: GamesSort }) => {
     const p = new URLSearchParams();
     if (next.search) p.set("search", next.search);
@@ -28,21 +28,6 @@ export default async function HomePage({
     if (next.sort && next.sort !== "newest") p.set("sort", next.sort);
     const q = p.toString();
     return q ? `/?${q}` : "/";
-  };
-
-  const sortTab = (key: GamesSort, label: string) => {
-    const active = sort === key;
-    return (
-      <Link
-        href={hrefWith({ search, tag, sort: key })}
-        aria-current={active ? "page" : undefined}
-        className={`rounded-pill px-3 py-1.5 text-[13px] transition-colors ${
-          active ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-        }`}
-      >
-        {label}
-      </Link>
-    );
   };
 
   const sectionTitle = search
@@ -55,41 +40,13 @@ export default async function HomePage({
 
   return (
     <div className="mx-auto max-w-6xl">
-      {/* 顶部行：搜索 + 排序切换（GET 表单 → RSC 重渲染，无需客户端 JS） */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <form method="get" className="relative w-full sm:flex-1">
-          <svg
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
-            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-            aria-hidden
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4-4" />
-          </svg>
-          <input
-            type="search"
-            name="search"
-            defaultValue={search ?? ""}
-            placeholder="搜索游戏、作者、标签…"
-            aria-label="搜索游戏"
-            className="h-11 w-full rounded-md border border-hairline bg-surface pl-10 pr-3 text-sm text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.025)] outline-none placeholder:text-ink-faint focus:border-hairline-strong"
-          />
-          {tag ? <input type="hidden" name="tag" value={tag} /> : null}
-          {sort === "popular" ? <input type="hidden" name="sort" value="popular" /> : null}
-        </form>
-        <div className="flex shrink-0 items-center gap-1 rounded-pill border border-hairline bg-surface p-1">
-          {sortTab("newest", "最新")}
-          {sortTab("popular", "最热")}
-        </div>
-      </div>
-
       {/* 分类筛选 pill 行（真实去重标签，替代写死分类）。 */}
       {tags.length > 0 ? (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <Link
             href={hrefWith({ search, sort })}
             aria-current={!tag ? "page" : undefined}
-            className={`rounded-pill px-3.5 py-1.5 text-[13px] transition-colors ${
+            className={`rounded-pill px-4 py-2 text-[13px] transition-colors ${
               !tag ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
             }`}
           >
@@ -102,7 +59,7 @@ export default async function HomePage({
                 key={t}
                 href={hrefWith({ search, tag: t, sort })}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-pill px-3.5 py-1.5 text-[13px] transition-colors ${
+                className={`rounded-pill px-4 py-2 text-[13px] transition-colors ${
                   active ? "bg-ink font-semibold text-bg" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
                 }`}
               >
@@ -113,10 +70,16 @@ export default async function HomePage({
         </div>
       ) : null}
 
-      {/* 区块标题 + 数量 */}
+      {/* 区块标题 + 查看全部（参考稿）。 */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="truncate text-[18px] font-extrabold text-ink">{sectionTitle}</h2>
-        <span className="shrink-0 font-mono text-[11px] text-ink-faint">{games.length} 款</span>
+        {search || tag ? (
+          <Link href="/" className="shrink-0 text-[13px] text-brand-cyan transition-opacity hover:opacity-80">
+            清除筛选
+          </Link>
+        ) : (
+          <span className="shrink-0 font-mono text-[11px] text-ink-faint">{games.length} 款</span>
+        )}
       </div>
 
       {games.length === 0 ? (
