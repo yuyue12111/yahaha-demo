@@ -16,10 +16,11 @@ const NODES: { name: AgentName; label: string; desc: string }[] = [
   { name: "PACKAGER", label: "Packager", desc: "打包上传+写版本" },
 ];
 
-const EXAMPLES = [
-  "一个太空主题的躲避小游戏，霓虹风格，越玩越快。",
-  "赛博朋克跑酷，自动奔跑＋跳跃躲障碍，节奏感强。",
-  "接住坠落星星的休闲小游戏，漏接三次结束。",
+// 参考稿用短标签 chip（太空躲避/霓虹跑酷/塔防），点按填入完整创意。
+const EXAMPLES: { label: string; prompt: string }[] = [
+  { label: "太空躲避", prompt: "一个太空主题的躲避小游戏，霓虹风格，越玩越快。" },
+  { label: "霓虹跑酷", prompt: "赛博朋克跑酷，自动奔跑＋跳跃躲障碍，节奏感强。" },
+  { label: "接星星", prompt: "接住坠落星星的休闲小游戏，漏接三次结束。" },
 ];
 
 type NodeState = "pending" | "running" | "done" | "failed";
@@ -30,6 +31,13 @@ const STATE_COLOR: Record<NodeState, string> = {
   running: "var(--running)",
   done: "var(--ok)",
   failed: "var(--danger)",
+};
+// 参考稿节点状态胶囊用语
+const STATE_LABEL: Record<NodeState, string> = {
+  pending: "pending",
+  running: "running",
+  done: "succeeded",
+  failed: "failed",
 };
 
 export function CreateStudio({
@@ -306,12 +314,12 @@ export function CreateStudio({
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   {EXAMPLES.map((ex) => (
                     <button
-                      key={ex}
+                      key={ex.label}
                       type="button"
-                      onClick={() => setPrompt(ex)}
+                      onClick={() => setPrompt(ex.prompt)}
                       className="rounded-pill border border-hairline px-3.5 py-2 text-[12.5px] text-ink-muted transition-colors hover:border-hairline-brand hover:text-ink"
                     >
-                      {ex.length > 12 ? ex.slice(0, 11) + "…" : ex}
+                      {ex.label}
                     </button>
                   ))}
                 </div>
@@ -417,16 +425,32 @@ export function CreateStudio({
                               onClick={() => setExpanded((m) => ({ ...m, [node.name]: !m[node.name] }))}
                               className="min-w-0 flex-1 pb-4 text-left"
                             >
+                              {/* 行1：节点名 + 状态胶囊（参考稿） */}
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[13.5px] font-semibold text-ink">{node.label}</span>
-                                <span className="flex items-center gap-2">
-                                  <span className="font-mono text-[10px]" style={{ color: STATE_COLOR[st] }}>
-                                    {st}
-                                    {log?.latencyMs != null ? ` · ${log.latencyMs}ms` : ""}
-                                    {log && (log.tokensIn != null || log.tokensOut != null)
-                                      ? ` · ${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
-                                      : ""}
-                                  </span>
+                                <span
+                                  className="inline-flex shrink-0 items-center gap-1.5 rounded-pill px-2 py-0.5 font-mono text-[10px]"
+                                  style={{ color: STATE_COLOR[st], background: `color-mix(in srgb, ${STATE_COLOR[st]} 14%, transparent)` }}
+                                >
+                                  <span
+                                    className={`h-1.5 w-1.5 rounded-full ${st === "running" ? "yh-dotpulse" : ""}`}
+                                    style={{ background: STATE_COLOR[st] }}
+                                  />
+                                  {STATE_LABEL[st]}
+                                </span>
+                              </div>
+                              {/* 行2：描述 + 耗时/token + chevron（参考稿） */}
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <p className="text-[12px] text-ink-faint">{node.desc}</p>
+                                <span className="flex shrink-0 items-center gap-2">
+                                  {log?.latencyMs != null || (log && (log.tokensIn != null || log.tokensOut != null)) ? (
+                                    <span className="font-mono text-[10px] text-ink-faint">
+                                      {log?.latencyMs != null ? `${log.latencyMs}ms` : ""}
+                                      {log && (log.tokensIn != null || log.tokensOut != null)
+                                        ? `${log?.latencyMs != null ? " · " : ""}${(log.tokensIn ?? 0) + (log.tokensOut ?? 0)}tok`
+                                        : ""}
+                                    </span>
+                                  ) : null}
                                   {log?.outputSummary ? (
                                     <svg
                                       width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
@@ -439,7 +463,6 @@ export function CreateStudio({
                                   ) : null}
                                 </span>
                               </div>
-                              <p className="mt-0.5 text-[12px] text-ink-faint">{node.desc}</p>
                               {st === "running" ? (
                                 <div className="yh-shimmer-track mt-1.5 h-0.5 w-full rounded bg-surface-2" />
                               ) : null}

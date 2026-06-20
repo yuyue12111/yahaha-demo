@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { BrandDefs } from "@/components/brand/Logo";
+import { IntroOverlay } from "@/components/brand/IntroOverlay";
 
 // Vendored (next/font/local) → no build-time network; --font-sans drives the Tailwind sans stack.
 const jakarta = localFont({
@@ -26,6 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
         <BrandDefs />
         {children}
+        {/* 入场动画（每会话一次，盖在真 app 上播完淡出；reduced-motion 跳过） */}
+        <IntroOverlay />
       </body>
     </html>
   );

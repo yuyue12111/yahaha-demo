@@ -227,92 +227,73 @@ export function PlayShell({
           ) : null}
         </div>
 
-        {/* stage */}
-        <div
-          ref={stageRef}
-          className="relative aspect-[16/10] w-full overflow-hidden bg-surface-inset"
-        >
-          {/* 招牌辉光（参考稿）：游戏未铺满时透出的紫色光晕 */}
+        {/* stage：外层辉光 + 旋转 aura + 居中内嵌圆角面板（参考稿 Play 游戏面板） */}
+        <div ref={stageRef} className="relative aspect-[16/10] w-full bg-surface-inset p-4 sm:p-6">
           <div
             className="pointer-events-none absolute inset-0"
-            style={{ background: "radial-gradient(circle at 50% 38%, rgba(192,59,255,.16), transparent 62%)" }}
+            style={{ background: "radial-gradient(circle at 50% 40%, rgba(192,59,255,.30), transparent 60%), linear-gradient(150deg,#1a1228,#100c18)" }}
             aria-hidden
           />
-          {active ? (
-            <iframe
-              key={reloadKey}
-              ref={iframeRef}
-              src={active.entryUrl}
-              // ★ allow-scripts ONLY — no allow-same-origin (cross-origin isolation, Fatal #2).
-              sandbox="allow-scripts"
-              title={`Game ${gameId}`}
-              className="relative h-full w-full border-0"
-              onLoad={() => {
-                onloadRef.current = true;
-              }}
-            />
-          ) : null}
+          <div
+            className="yh-aura pointer-events-none absolute left-1/2 top-1/2 h-[min(82%,420px)] w-[min(82%,420px)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl"
+            style={{ background: "conic-gradient(from 0deg, rgba(255,59,167,.20), rgba(192,59,255,.04), rgba(39,224,255,.16), rgba(255,59,167,.20))" }}
+            aria-hidden
+          />
+          {/* 内嵌游戏面板：圆角 + 描边，四周透出辉光（参考稿 84%×82% 居中面板） */}
+          <div className="relative h-full w-full overflow-hidden rounded-[14px] border border-hairline-strong shadow-[inset_0_0_70px_rgba(0,0,0,.55),0_20px_44px_-18px_rgba(0,0,0,.75)]">
+            {active ? (
+              <iframe
+                key={reloadKey}
+                ref={iframeRef}
+                src={active.entryUrl}
+                // ★ allow-scripts ONLY — no allow-same-origin (cross-origin isolation, Fatal #2).
+                sandbox="allow-scripts"
+                title={`Game ${gameId}`}
+                className="relative z-[1] h-full w-full border-0"
+                onLoad={() => {
+                  onloadRef.current = true;
+                }}
+              />
+            ) : null}
 
-          {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
-          {status === "loaded" && showStart ? (
-            <StartOverlay
-              controls={active?.controls ?? ""}
-              onStart={() => {
-                iframeRef.current?.focus();
-                setShowStart(false);
-              }}
-            />
-          ) : null}
-          {status === "failed" ? (
-            <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
-          ) : null}
-          {status === "ended" ? (
-            <EndedOverlay score={score} onRestart={handleRestart} />
-          ) : null}
+            {status === "loading" ? <LoadingOverlay controls={active?.controls ?? ""} /> : null}
+            {status === "loaded" && showStart ? (
+              <StartOverlay
+                controls={active?.controls ?? ""}
+                onStart={() => {
+                  iframeRef.current?.focus();
+                  setShowStart(false);
+                }}
+              />
+            ) : null}
+            {status === "failed" ? (
+              <FailedOverlay url={fail.url} reason={fail.reason} onRetry={handleRetry} />
+            ) : null}
+            {status === "ended" ? (
+              <EndedOverlay score={score} onRestart={handleRestart} />
+            ) : null}
+          </div>
         </div>
 
-        {/* control bar — 真实控件：重开 / 全屏 / 分享(复制链接)；右侧真实统计（实时分数 + 总游玩） */}
+        {/* control bar（参考稿）：圆角图标控件 + 右侧真实统计。只放能真实工作的（重开/分享/全屏），
+            不放无后端的 暂停/音量/收藏/假在线数。 */}
         {active ? (
-          <div className="flex items-center gap-2 border-t border-hairline bg-surface px-4 py-3">
+          <div className="flex items-center gap-1.5 border-t border-hairline bg-surface px-4 py-2.5">
             <button
               type="button"
               onClick={handleRestart}
               disabled={status !== "loaded" && status !== "ended"}
               title="重开"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
+              aria-label="重开"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-hairline-strong text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M3 12a9 9 0 1 0 2.6-6.4" />
                 <path d="M3 4v4h4" />
               </svg>
-              重开
-            </button>
-            <button
-              type="button"
-              onClick={handleFullscreen}
-              title="全屏"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
-              </svg>
-              全屏
-            </button>
-            <button
-              type="button"
-              onClick={handleShare}
-              title="复制链接"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline-strong px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="18" cy="5" r="2.5" />
-                <circle cx="6" cy="12" r="2.5" />
-                <circle cx="18" cy="19" r="2.5" />
-                <path d="M8.2 10.8 15.8 6.2M8.2 13.2l7.6 4.6" />
-              </svg>
-              {copied ? "已复制" : "分享"}
             </button>
             <div className="flex-1" />
+            {copied ? <span className="font-mono text-[11px]" style={{ color: "var(--ok)" }}>已复制链接</span> : null}
             {status === "loaded" || status === "ended" ? (
               <span className="font-mono text-[11px] text-ink-muted">Score {score}</span>
             ) : null}
@@ -320,6 +301,31 @@ export function PlayShell({
               <span className="text-ink-faint">▶</span>
               {playCount}
             </span>
+            <button
+              type="button"
+              onClick={handleShare}
+              title="复制链接"
+              aria-label="分享（复制链接）"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors hover:text-ink"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="18" cy="5" r="2.5" />
+                <circle cx="6" cy="12" r="2.5" />
+                <circle cx="18" cy="19" r="2.5" />
+                <path d="M8.2 10.8 15.8 6.2M8.2 13.2l7.6 4.6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleFullscreen}
+              title="全屏"
+              aria-label="全屏"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors hover:text-ink"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            </button>
           </div>
         ) : null}
       </div>
