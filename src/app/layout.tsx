@@ -25,6 +25,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN" className={jakarta.variable}>
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
+        {/* 首帧前：已看过 intro 的会话给 <html> 加 .intro-seen → CSS 隐藏覆盖层，避免后续导航（含搜索）闪黑场 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(sessionStorage.getItem('yahaha-intro-seen'))document.documentElement.classList.add('intro-seen')}catch(e){}",
+          }}
+        />
         {children}
         {/* 入场动画（每会话一次，盖在真 app 上播完淡出；reduced-motion 跳过） */}
         <IntroOverlay />

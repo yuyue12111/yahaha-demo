@@ -280,6 +280,7 @@ export function IntroOverlay() {
 
   return (
     <div
+      id="yahaha-intro"
       className="fixed inset-0 z-[100] overflow-hidden"
       style={{ pointerEvents: revealing ? "none" : "auto" }}
       role="presentation"
