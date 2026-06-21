@@ -45,6 +45,12 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
   GITHUB_CLIENT_ID: z.string().optional().default(""),
   GITHUB_CLIENT_SECRET: z.string().optional().default(""),
+  // 本地 Demo OAuth IdP（仿第三方登录，演示完整 授权→回调→账号绑定；无密钥可复现）。compose 默认开，生产关。
+  ENABLE_DEMO_OAUTH: z
+    .enum(["true", "false"])
+    .optional()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // ---- 资源限额 / 安全阈值 (docs/07 §5) ----
   MAX_UPLOAD_BYTES: intDefault(10_485_760), // 10MB
@@ -86,6 +92,7 @@ export const env = EnvSchema.parse({
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+  ENABLE_DEMO_OAUTH: process.env.ENABLE_DEMO_OAUTH,
 
   MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
   GENERATION_TIMEOUT_MS: process.env.GENERATION_TIMEOUT_MS,

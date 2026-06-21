@@ -59,6 +59,7 @@ enum AuthProvider {
   CREDENTIALS
   GOOGLE
   GITHUB
+  DEMO
 }
 
 enum PlayEventType {

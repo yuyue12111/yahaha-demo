@@ -16,7 +16,7 @@ export function AuthForm({
   oauth,
 }: {
   mode: "login" | "register";
-  oauth?: { google: boolean; github: boolean };
+  oauth?: { google: boolean; github: boolean; demo: boolean };
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -80,14 +80,29 @@ export function AuthForm({
         {pending ? "请稍候…" : mode === "register" ? "创建账号" : "登录"}
       </Button>
 
-      {/* OAuth 第三方登录：仅在该 provider 配齐凭据时渲染（env-gated）。点击 → NextAuth OAuth 流程 → 回调 /api/auth/callback/{provider} → 账号绑定（auth.ts linkOAuthAccount）。 */}
-      {oauth && (oauth.google || oauth.github) ? (
+      {/* OAuth 第三方登录：仅在该 provider 配齐凭据/启用时渲染（env-gated）。点击 → NextAuth OAuth 流程 → 回调 /api/auth/callback/{provider} → 账号绑定（auth.ts linkOAuthAccount）。 */}
+      {oauth && (oauth.google || oauth.github || oauth.demo) ? (
         <>
           <div className="my-1 flex items-center gap-3 text-[11px] text-ink-faint">
             <span className="h-px flex-1 bg-hairline" />
             <span>或继续使用</span>
             <span className="h-px flex-1 bg-hairline" />
           </div>
+          {oauth.demo ? (
+            <button
+              type="button"
+              onClick={() => signIn("demo", { callbackUrl: next })}
+              aria-label="使用 Demo OAuth 登录"
+              className="mb-1 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[rgba(124,92,255,.45)] bg-[rgba(124,92,255,.08)] text-[13px] font-medium text-ink transition-colors hover:bg-[rgba(124,92,255,.16)]"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <polyline points="10 17 15 12 10 7" />
+                <line x1="15" y1="12" x2="3" y2="12" />
+              </svg>
+              Demo OAuth（演示授权回调 + 账号绑定）
+            </button>
+          ) : null}
           <div className="flex gap-2">
             {oauth.google ? (
               <OAuthButton provider="google" label="Google" next={next}>
