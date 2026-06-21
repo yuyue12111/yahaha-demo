@@ -37,6 +37,9 @@ const EnvSchema = z.object({
   MODEL_API_KEY: z.string().optional().default(""),
   MODEL_NAME: z.string().min(1).default("gpt-5.5"),
   VISION_MODEL_NAME: z.string().optional().default(""),
+  // CODER 模式：auto = 真模型时用 GPT-5.5 真写 game.js（复杂/多样游戏），mock 时用确定性模板（离线复现）。
+  // template = 永远用模板；llm = 永远用模型（mock 下会回退模板）。
+  CODER_MODE: z.enum(["auto", "template", "llm"]).optional().default("auto"),
 
   // ---- OAuth 第三方登录（加分项，docs/03 §OAuth）----
   // env-gated：配齐 id+secret 才注册对应 provider（仿模型 seam）。缺省即不启用 → 邮箱登录照常，
@@ -87,6 +90,7 @@ export const env = EnvSchema.parse({
   MODEL_API_KEY: process.env.MODEL_API_KEY,
   MODEL_NAME: process.env.MODEL_NAME,
   VISION_MODEL_NAME: process.env.VISION_MODEL_NAME,
+  CODER_MODE: process.env.CODER_MODE,
 
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
