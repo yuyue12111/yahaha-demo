@@ -57,7 +57,9 @@ const EnvSchema = z.object({
 
   // ---- 资源限额 / 安全阈值 (docs/07 §5) ----
   MAX_UPLOAD_BYTES: intDefault(10_485_760), // 10MB
-  GENERATION_TIMEOUT_MS: intDefault(180_000),
+  GENERATION_TIMEOUT_MS: intDefault(360_000), // 任务级看护：给真模型 code-gen 留足时间（6min），仍是兜底
+  MODEL_TIMEOUT_MS: intDefault(240_000), // 单次模型调用超时（AbortController）→ 防慢调用永挂，超时即抛→节点回退
+  CODER_LLM_BUDGET_MS: intDefault(270_000), // code-gen CODER 自身预算：超此预算放弃模型、回退确定性模板
   MAX_AGENT_RETRIES: intDefault(2),
   MAX_BUNDLE_BYTES: intDefault(2_097_152), // 2MB
   WORKER_CONCURRENCY: intDefault(2),
@@ -100,6 +102,8 @@ export const env = EnvSchema.parse({
 
   MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
   GENERATION_TIMEOUT_MS: process.env.GENERATION_TIMEOUT_MS,
+  MODEL_TIMEOUT_MS: process.env.MODEL_TIMEOUT_MS,
+  CODER_LLM_BUDGET_MS: process.env.CODER_LLM_BUDGET_MS,
   MAX_AGENT_RETRIES: process.env.MAX_AGENT_RETRIES,
   MAX_BUNDLE_BYTES: process.env.MAX_BUNDLE_BYTES,
   WORKER_CONCURRENCY: process.env.WORKER_CONCURRENCY,

@@ -32,6 +32,8 @@ export const CreateTaskRequest = z.object({
   assetIds: z.array(z.string().min(1)).max(8).optional(),
   gameId: z.string().min(1).optional(),
   remixOfVersionId: z.string().min(1).optional(),
+  // 自然语言微调：refine 表示在已有 game.js 上按 prompt（指令）定向编辑（需带 gameId）。
+  mode: z.enum(["create", "refine"]).optional().default("create"),
 });
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequest>;
 

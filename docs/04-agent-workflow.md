@@ -25,6 +25,10 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
 | `VALIDATOR` | `{ files }` | `{ ok, errors[], coverPng? }` | **静态**校验：运行时契约存在性 + 体积/CSP 扫描（**绝不执行生成码**）。AST 解析(acorn/esbuild) **DEFERRED 2026-06-19** —— 当前用结构/字符串校验（语法坏的 game.js 理论可漏过，但模板化 CODER 恒产合法码，happy path 不触）。**可选** headless 截图当封面。 |
 | `PACKAGER` | `{ files, validation }` | `{ manifest, bundleKeys[], coverKey, manifestUrl }` | 算哈希、组 `manifest.json`、上传 MinIO 版本化路径、写 `Version`。 |
 
+**自然语言微调（refine 模式，2026-06-21）**：`GenerationTask.mode='refine'`（需带 `gameId`，owner-only）→ runner 载入该游戏最新版本的 `game.js` 注入 `ctx.refineCode`；CODER 走 `runCoderRefine`（把现有代码 + 一句话指令交给模型做**最小定向编辑**，保留玩法/数值/postMessage 协议；校验失败**抛错→任务 FAILED、原游戏不变**，绝不回退模板以免换掉游戏）；PACKAGER 产 `versionNumber+1`；成功后 runner **自动 `publishGameVersion`** 激活新版本，玩家立即看到改动。详情页 `RefinePanel`（owner）输入指令→轮询→刷新。
+
+**超时韧性（2026-06-21）**：真模型 code-gen/refine 较慢——`MODEL_TIMEOUT_MS`（单次调用 AbortController）防慢/挂死调用；`CODER_LLM_BUDGET_MS` 为 code-gen 自身预算，超预算/超时/坏输出 → 回退确定性模板（create）或 FAILED（refine）；`GENERATION_TIMEOUT_MS` 调至 6min 兜底。任务永不因模型慢而无声卡死。
+
 ## GameSpec（PLANNER 输出，Zod 契约）
 
 ```jsonc

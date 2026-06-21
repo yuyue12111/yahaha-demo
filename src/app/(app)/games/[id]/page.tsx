@@ -8,6 +8,7 @@ import { RemoteImg } from "@/components/ui/RemoteImg";
 import { GameManagePanel } from "@/components/game/GameManagePanel";
 import { LikeButton } from "@/components/game/LikeButton";
 import { BookmarkButton } from "@/components/game/BookmarkButton";
+import { RefinePanel } from "@/components/game/RefinePanel";
 
 // 单游戏详情页（T3）：承载玩法提示（T1）+ 统计 + 立即游玩 + 作者管理面板（T2-1）。
 export const dynamic = "force-dynamic";
@@ -157,14 +158,17 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* 作者管理（T2-1 owner-scoped） */}
+      {/* 作者管理（T2-1 owner-scoped）+ 自然语言微调 */}
       {isOwner ? (
-        <GameManagePanel
-          gameId={game.id}
-          status={game.status}
-          initial={{ title: game.title, summary: game.summary, tags: game.tags }}
-          publishVersionId={latestVersion?.id ?? null}
-        />
+        <>
+          {latestVersion ? <RefinePanel gameId={game.id} /> : null}
+          <GameManagePanel
+            gameId={game.id}
+            status={game.status}
+            initial={{ title: game.title, summary: game.summary, tags: game.tags }}
+            publishVersionId={latestVersion?.id ?? null}
+          />
+        </>
       ) : null}
     </div>
   );

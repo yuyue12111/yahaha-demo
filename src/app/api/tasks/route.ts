@@ -45,7 +45,12 @@ export async function POST(req: Request) {
       { status: 422 },
     );
   }
-  const { prompt, assetIds, gameId } = parsed.data;
+  const { prompt, assetIds, gameId, mode } = parsed.data;
+
+  // refine（自然语言微调）必须指定要改的游戏。
+  if (mode === "refine" && !gameId) {
+    return NextResponse.json(errorEnvelope("VALIDATION_ERROR", "微调需指定 gameId"), { status: 422 });
+  }
 
   // B4：内容审核（docs/07 §内容审核）。命中禁词 → 422 不建任务、不入队（生成前拦截）。
   const mod = moderatePrompt(prompt);
@@ -84,6 +89,7 @@ export async function POST(req: Request) {
       prompt,
       inputAssetIds: assetIds ?? [],
       gameId: gameId ?? null,
+      mode,
       status: "PENDING",
     },
     select: { id: true },
