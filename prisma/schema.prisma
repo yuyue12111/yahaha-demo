@@ -59,6 +59,7 @@ enum AuthProvider {
   CREDENTIALS
   GOOGLE
   GITHUB
+  DEMO
 }
 
 enum PlayEventType {
@@ -172,6 +173,7 @@ model GenerationTask {
   game            Game?      @relation(fields: [gameId], references: [id])
   prompt          String
   inputAssetIds   String[]
+  mode            String     @default("create") // create | refine（自然语言微调：基于现有 game.js 定向编辑）
   status          TaskStatus @default(PENDING)
   currentStep     AgentName?
   modelProvider   String?

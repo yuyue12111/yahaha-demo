@@ -8,6 +8,7 @@ import { RemoteImg } from "@/components/ui/RemoteImg";
 import { GameManagePanel } from "@/components/game/GameManagePanel";
 import { LikeButton } from "@/components/game/LikeButton";
 import { BookmarkButton } from "@/components/game/BookmarkButton";
+import { RefinePanel } from "@/components/game/RefinePanel";
 
 // 单游戏详情页（T3）：承载玩法提示（T1）+ 统计 + 立即游玩 + 作者管理面板（T2-1）。
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const session = await auth();
   const userId = session?.user?.id ?? null;
-  const [game, active, liked, favorited] = await Promise.all([
+  const [game, active, liked, favorited, latestVersion] = await Promise.all([
     prisma.game.findUnique({
       where: { id },
       include: {
@@ -38,6 +39,12 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
     userId
       ? prisma.favorite.findUnique({ where: { userId_gameId: { userId, gameId: id } }, select: { id: true } })
       : Promise.resolve(null),
+    // 最新 version id（草稿发布用）：作者在详情页一键发布最新版本。
+    prisma.version.findFirst({
+      where: { gameId: id },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true },
+    }),
   ]);
 
   if (!game) notFound();
@@ -151,13 +158,17 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* 作者管理（T2-1 owner-scoped） */}
+      {/* 作者管理（T2-1 owner-scoped）+ 自然语言微调 */}
       {isOwner ? (
-        <GameManagePanel
-          gameId={game.id}
-          status={game.status}
-          initial={{ title: game.title, summary: game.summary, tags: game.tags }}
-        />
+        <>
+          {latestVersion ? <RefinePanel gameId={game.id} /> : null}
+          <GameManagePanel
+            gameId={game.id}
+            status={game.status}
+            initial={{ title: game.title, summary: game.summary, tags: game.tags }}
+            publishVersionId={latestVersion?.id ?? null}
+          />
+        </>
       ) : null}
     </div>
   );

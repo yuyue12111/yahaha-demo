@@ -32,14 +32,26 @@ export class OpenAICompatibleClient implements ModelClient {
     tokensIn: number;
     tokensOut: number;
   }> {
-    const res = await fetch(`${env.MODEL_BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${env.MODEL_API_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // 单次调用超时（AbortController）：防慢/挂死的模型调用占满任务预算。超时抛错 → 节点层捕获/回退。
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), env.MODEL_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(`${env.MODEL_BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${env.MODEL_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      if (ctrl.signal.aborted) throw new Error(`model 请求超时 ${env.MODEL_TIMEOUT_MS}ms`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       throw new Error(`model HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }

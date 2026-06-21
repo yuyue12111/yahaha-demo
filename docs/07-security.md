@@ -55,6 +55,7 @@
 - **账号绑定**（JWT 策略 + 无 DB adapter → `auth.ts` `linkOAuthAccount` 手动落库）：① 按 `(provider, providerAccountId)` 命中已绑 `Account` → 复用其 `User`（重复登录稳定同一身份）；② 否则按 email upsert `User`（同邮箱的 Credentials 账号可被绑定），再建 `Account`。GitHub 邮箱私密时合成稳定占位邮箱。
 - **回调**：`/api/auth/callback/{google,github}`；`state`/PKCE 由 Auth.js 提供。读 Prisma 的 jwt 回调只在 Node `/api/auth` 路由跑，middleware 走 `auth.config`（无 Prisma）→ Prisma 绝不上 Edge。
 - **后续扩展**：再加 provider = 在 `auth.ts` 依葫芦加一段 env-gated push + `AuthProvider` 枚举值即可；账号合并（同邮箱跨 provider）已天然支持。
+- **本地 Demo OAuth IdP（演示用，2026-06-21）**：为在**无真凭据**下端到端演示「能真实跑通 + 授权回调 + 账号绑定结果」，内置一个本地仿 OAuth 身份提供方：`/api/demo-oauth/{authorize,token,userinfo}` 三端点 + NextAuth 自定义 `demo` provider（`AuthProvider.DEMO`）。走与 Google/GitHub **完全相同**的 NextAuth OAuth 客户端 + 回调 + `linkOAuthAccount` 代码路径：授权同意页 → 回调 `/api/auth/callback/demo` → 建 `User`+`Account(DEMO)` → 登录。`ENABLE_DEMO_OAUTH` 控制（compose 默认 true 便于评审；**生产置 false**——它让任何人以固定 demo 账号登录，是有意的演示后门）。红线⑤：无密钥可复现。
 
 ## 实现状态标注（交付前更新）
 

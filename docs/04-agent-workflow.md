@@ -21,9 +21,13 @@ INGEST → PLANNER → ASSET_CURATOR → CODER → VALIDATOR → PACKAGER
 | `INGEST` | `{ prompt, assetRefs[] }` | `{ brief, assetDescriptions[] }` | 归一多模态：图片经 `VISION_MODEL` 转场景/资产描述影响生成；无 vision 模型则退化纯文本。**诚实口径（2026-06-21 已闭合）**：`ingest.ts` 对图片素材从 MinIO 读真字节（`storage.getObjectBytes`，守红线①）→ 内联 base64 data URL 传 `vision({imageUrl})` → 接真 GPT-5.5 **真读上传像素**；用 data URL 而非 presigned localhost URL（远端模型不可达）。mock 仍按 `hint`+`seedKey` 确定性（忽略 imageUrl），离线异上传异产物，红线③成立。非图片/超 4MB/读失败 → 退化 hint-only。 |
 | `PLANNER` | `{ brief }` | `GameSpec` | 创意 → 结构化设计规格（见下 Schema）。 |
 | `ASSET_CURATOR` | `{ spec, assets[] }` | `AssetPlan` | 把上传素材映射到精灵/背景，缺口用占位/生成；输出含 S3 key 映射。 |
-| `CODER` | `{ spec, assetPlan }` | `{ files: {path,content}[] }` | 产出自包含 HTML5 游戏（满足运行时契约：挂载 `#game-root` + postMessage 生命周期）。内部可带有限自修复。 |
+| `CODER` | `{ spec, assetPlan }` | `{ files: {path,content}[] }` | 产出自包含 HTML5 游戏（满足运行时契约：挂载 `#game-root` + postMessage 生命周期）。**两种实现（`CODER_MODE`，2026-06-21）**：① `auto`（默认）—— 真模型(provider≠mock)时走 **LLM code-gen**：GPT-5.5 据创意+spec **真写整个 game.js**（复杂/多样游戏，如跑酷），经语法+协议+体积校验，失败/坏输出**回退确定性模板**；mock 时用模板（离线复现+红线③确定性）。② `template`/`llm` 强制单一路径。模型生成代码在跨域 sandbox(红线②)里跑，碰不到宿主。 |
 | `VALIDATOR` | `{ files }` | `{ ok, errors[], coverPng? }` | **静态**校验：运行时契约存在性 + 体积/CSP 扫描（**绝不执行生成码**）。AST 解析(acorn/esbuild) **DEFERRED 2026-06-19** —— 当前用结构/字符串校验（语法坏的 game.js 理论可漏过，但模板化 CODER 恒产合法码，happy path 不触）。**可选** headless 截图当封面。 |
 | `PACKAGER` | `{ files, validation }` | `{ manifest, bundleKeys[], coverKey, manifestUrl }` | 算哈希、组 `manifest.json`、上传 MinIO 版本化路径、写 `Version`。 |
+
+**自然语言微调（refine 模式，2026-06-21）**：`GenerationTask.mode='refine'`（需带 `gameId`，owner-only）→ runner 载入该游戏最新版本的 `game.js` 注入 `ctx.refineCode`；CODER 走 `runCoderRefine`（把现有代码 + 一句话指令交给模型做**最小定向编辑**，保留玩法/数值/postMessage 协议；校验失败**抛错→任务 FAILED、原游戏不变**，绝不回退模板以免换掉游戏）；PACKAGER 产 `versionNumber+1`；成功后 runner **自动 `publishGameVersion`** 激活新版本，玩家立即看到改动。详情页 `RefinePanel`（owner）输入指令→轮询→刷新。
+
+**超时韧性（2026-06-21）**：真模型 code-gen/refine 较慢——`MODEL_TIMEOUT_MS`（单次调用 AbortController）防慢/挂死调用；`CODER_LLM_BUDGET_MS` 为 code-gen 自身预算，超预算/超时/坏输出 → 回退确定性模板（create）或 FAILED（refine）；`GENERATION_TIMEOUT_MS` 调至 6min 兜底。任务永不因模型慢而无声卡死。
 
 ## GameSpec（PLANNER 输出，Zod 契约）
 

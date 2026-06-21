@@ -124,6 +124,10 @@ export type AgentContext = {
   assetIds: string[];
   seedKey: string;
   model: ModelClient;
+  /** 'refine' = 自然语言微调：基于 refineCode 定向编辑（prompt 为指令）。默认 'create'。 */
+  mode: "create" | "refine";
+  /** refine 模式下载入的现有 game.js 源码（供 CODER 编辑）；create 模式为 null。 */
+  refineCode: string | null;
 };
 
 /**

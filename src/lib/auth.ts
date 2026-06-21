@@ -7,6 +7,7 @@ import { authConfig } from "./auth.config";
 import { env } from "./env";
 import { prisma } from "./db";
 import { LoginSchema } from "./contracts/auth";
+import { appOrigin } from "./demo-oauth";
 
 /**
  * 完整 NextAuth（Node 端）：Edge-safe 基座 + Credentials（邮箱+密码）+ env-gated OAuth（Google/GitHub）。
@@ -17,6 +18,24 @@ import { LoginSchema } from "./contracts/auth";
 export const oauthEnabled = {
   google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
   github: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
+  // 本地 Demo OAuth IdP：无密钥即可演示完整 授权→回调→账号绑定（compose 默认开）。
+  demo: env.ENABLE_DEMO_OAUTH,
+};
+
+/** 自定义「Demo OAuth」provider：指向本地 IdP 三端点。走与 Google/GitHub 完全相同的 NextAuth OAuth 客户端 + 回调路径。 */
+const demoOAuthProvider = {
+  id: "demo",
+  name: "Demo OAuth",
+  type: "oauth" as const,
+  clientId: "demo-client",
+  clientSecret: "demo-secret",
+  checks: ["state"] as ("pkce" | "state" | "none")[],
+  authorization: { url: `${appOrigin()}/api/demo-oauth/authorize`, params: { scope: "openid email profile" } },
+  token: `${appOrigin()}/api/demo-oauth/token`,
+  userinfo: `${appOrigin()}/api/demo-oauth/userinfo`,
+  profile(p: { sub: string; name?: string; email?: string; picture?: string | null }) {
+    return { id: p.sub, name: p.name ?? null, email: p.email ?? null, image: p.picture ?? null };
+  },
 };
 
 type OAuthProfile = {
@@ -34,12 +53,12 @@ type OAuthProfile = {
  * GitHub 邮箱可能私密 → 合成稳定占位邮箱，保证 User.email 非空唯一。返回我方 DB User。
  */
 async function linkOAuthAccount(
-  provider: "google" | "github",
+  provider: "google" | "github" | "demo",
   providerAccountId: string,
   profile: OAuthProfile,
   tokens: { access_token?: string; refresh_token?: string; expires_at?: number },
 ) {
-  const providerEnum = provider === "google" ? "GOOGLE" : "GITHUB";
+  const providerEnum = provider === "google" ? "GOOGLE" : provider === "github" ? "GITHUB" : "DEMO";
   const bound = await prisma.account.findUnique({
     where: { provider_providerAccountId: { provider: providerEnum, providerAccountId } },
     include: { user: true },
@@ -96,6 +115,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...(oauthEnabled.github
       ? [GitHub({ clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET })]
       : []),
+    // 本地 Demo OAuth IdP（env-gated）：演示完整 授权→回调→账号绑定，无密钥可复现。
+    ...(oauthEnabled.demo ? [demoOAuthProvider] : []),
   ],
   callbacks: {
     ...authConfig.callbacks,
@@ -106,7 +127,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (user?.id) token.uid = user.id; // authorize 返回的就是 DB id
         return token;
       }
-      if (account && (account.provider === "google" || account.provider === "github") && profile) {
+      if (
+        account &&
+        (account.provider === "google" || account.provider === "github" || account.provider === "demo") &&
+        profile
+      ) {
         const dbUser = await linkOAuthAccount(
           account.provider,
           account.providerAccountId,

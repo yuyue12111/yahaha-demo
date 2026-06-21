@@ -37,6 +37,9 @@ const EnvSchema = z.object({
   MODEL_API_KEY: z.string().optional().default(""),
   MODEL_NAME: z.string().min(1).default("gpt-5.5"),
   VISION_MODEL_NAME: z.string().optional().default(""),
+  // CODER 模式：auto = 真模型时用 GPT-5.5 真写 game.js（复杂/多样游戏），mock 时用确定性模板（离线复现）。
+  // template = 永远用模板；llm = 永远用模型（mock 下会回退模板）。
+  CODER_MODE: z.enum(["auto", "template", "llm"]).optional().default("auto"),
 
   // ---- OAuth 第三方登录（加分项，docs/03 §OAuth）----
   // env-gated：配齐 id+secret 才注册对应 provider（仿模型 seam）。缺省即不启用 → 邮箱登录照常，
@@ -45,10 +48,18 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
   GITHUB_CLIENT_ID: z.string().optional().default(""),
   GITHUB_CLIENT_SECRET: z.string().optional().default(""),
+  // 本地 Demo OAuth IdP（仿第三方登录，演示完整 授权→回调→账号绑定；无密钥可复现）。compose 默认开，生产关。
+  ENABLE_DEMO_OAUTH: z
+    .enum(["true", "false"])
+    .optional()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // ---- 资源限额 / 安全阈值 (docs/07 §5) ----
   MAX_UPLOAD_BYTES: intDefault(10_485_760), // 10MB
-  GENERATION_TIMEOUT_MS: intDefault(180_000),
+  GENERATION_TIMEOUT_MS: intDefault(360_000), // 任务级看护：给真模型 code-gen 留足时间（6min），仍是兜底
+  MODEL_TIMEOUT_MS: intDefault(240_000), // 单次模型调用超时（AbortController）→ 防慢调用永挂，超时即抛→节点回退
+  CODER_LLM_BUDGET_MS: intDefault(270_000), // code-gen CODER 自身预算：超此预算放弃模型、回退确定性模板
   MAX_AGENT_RETRIES: intDefault(2),
   MAX_BUNDLE_BYTES: intDefault(2_097_152), // 2MB
   WORKER_CONCURRENCY: intDefault(2),
@@ -81,14 +92,18 @@ export const env = EnvSchema.parse({
   MODEL_API_KEY: process.env.MODEL_API_KEY,
   MODEL_NAME: process.env.MODEL_NAME,
   VISION_MODEL_NAME: process.env.VISION_MODEL_NAME,
+  CODER_MODE: process.env.CODER_MODE,
 
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+  ENABLE_DEMO_OAUTH: process.env.ENABLE_DEMO_OAUTH,
 
   MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
   GENERATION_TIMEOUT_MS: process.env.GENERATION_TIMEOUT_MS,
+  MODEL_TIMEOUT_MS: process.env.MODEL_TIMEOUT_MS,
+  CODER_LLM_BUDGET_MS: process.env.CODER_LLM_BUDGET_MS,
   MAX_AGENT_RETRIES: process.env.MAX_AGENT_RETRIES,
   MAX_BUNDLE_BYTES: process.env.MAX_BUNDLE_BYTES,
   WORKER_CONCURRENCY: process.env.WORKER_CONCURRENCY,

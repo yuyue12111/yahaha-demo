@@ -1,4 +1,6 @@
 import { Rng } from "../rng";
+import { env } from "../env";
+import type { Msg } from "../model";
 import type { AgentContext, CoderOutput, EngineTuning, GameSpec, NodeResult } from "./types";
 import { CoderOutput as CoderOutputSchema } from "./types";
 
@@ -308,10 +310,27 @@ function coverSvg(spec: GameSpec): string {
 }
 
 /**
- * CODER —— 产出自包含 HTML5 canvas 游戏（满足 docs/06 运行时契约：挂 #game-root + postMessage 生命周期）。
- * 通用引擎 + 内联 SPEC：玩法/配色/速度随 GameSpec 变 → 产物字节随输入变（规避红线③）。
+ * CODER 调度：真模型(非 mock) + CODER_MODE=auto/llm → GPT-5.5 真写整个 game.js（复杂/多样游戏，如跑酷）；
+ * 失败/不合格 → 回退确定性模板。mock 或 template 模式 → 模板（离线复现 + 红线③ 确定性）。
+ * 产物始终满足 docs/06 运行时契约（挂 canvas#c + postMessage 生命周期）；模型代码在跨域沙箱(红线②)里跑，碰不到宿主。
  */
-export async function runCoder(_ctx: AgentContext, spec: GameSpec): Promise<NodeResult<CoderOutput>> {
+export async function runCoder(ctx: AgentContext, spec: GameSpec): Promise<NodeResult<CoderOutput>> {
+  // 自然语言微调：基于现有 game.js 定向编辑。失败 → 抛错（任务 FAILED、原游戏不变），**不回退模板**（以免微调把游戏换成模板）。
+  if (ctx.mode === "refine" && ctx.refineCode) {
+    return runCoderRefine(ctx, spec, ctx.refineCode);
+  }
+  const useLLM =
+    env.CODER_MODE === "llm" || (env.CODER_MODE === "auto" && ctx.model.provider !== "mock");
+  if (useLLM) {
+    const llm = await runCoderLLM(ctx, spec);
+    if (llm) return llm; // 模型代码已校验通过
+    // 否则贯穿到模板（永不让流水线因模型坏输出而失败）
+  }
+  return runCoderTemplate(spec);
+}
+
+/** 确定性模板版（通用 3-mode 引擎 + 内联 SPEC）。token 恒 0。 */
+function runCoderTemplate(spec: GameSpec): NodeResult<CoderOutput> {
   const files = [
     { path: "index.html", content: indexHtml(spec), contentType: "text/html" },
     { path: "game.js", content: gameJs(spec), contentType: "application/javascript" },
@@ -321,10 +340,196 @@ export async function runCoder(_ctx: AgentContext, spec: GameSpec): Promise<Node
   const bytes = files.reduce((n, f) => n + Buffer.byteLength(f.content, "utf8"), 0);
   return {
     output,
-    // 确定性模板（不调模型）→ token 成本恒为 0（B3：6 节点全量记 token）。
     tokensIn: 0,
     tokensOut: 0,
-    inputSummary: `GameSpec(${spec.title}, mode=${spec.engine?.mode})`,
-    outputSummary: `${files.length} 文件 · ${bytes} bytes · index.html+game.js+cover.svg`,
+    inputSummary: `GameSpec(${spec.title}, mode=${spec.engine?.mode}) · 模板`,
+    outputSummary: `${files.length} 文件 · ${bytes} bytes · 确定性模板`,
   };
+}
+
+// ---- LLM code-gen CODER（真模型时用，让 GPT-5.5 真写游戏）----
+
+const CODER_LLM_SYSTEM = [
+  "你是资深 HTML5 Canvas 游戏工程师。只输出一个**完整、可直接运行、好玩**的 `game.js`（纯 JS，IIFE 包裹），不要解释、不要 markdown 代码块。",
+  "硬性要求：",
+  "- 单文件 vanilla JS，**禁止** import/export、禁止外部库/网络请求（运行环境 CSP 为 connect-src 'none'，fetch/XHR 会被拦）。可用 Canvas2D、Web Audio、requestAnimationFrame。",
+  "- 复用页面已有的 `<canvas id=\"c\">`：`var cv=document.getElementById('c'); var ctx=cv.getContext('2d');`。按 window 尺寸自适应并监听 resize（用 devicePixelRatio 更清晰）。",
+  "- 真正实现所描述的玩法，要有难度曲线、计分、结束与重开。键盘 + 触屏都要能玩。",
+  "- **Yahaha postMessage 协议 v1（必须严格实现）**：",
+  "  · 加载就绪：`parent.postMessage({source:'yahaha-game',v:1,type:'GAME_LOADED'},'*')`",
+  "  · 分数变化：`{source:'yahaha-game',v:1,type:'GAME_SCORE',score:<number>}`",
+  "  · 游戏结束：`{source:'yahaha-game',v:1,type:'GAME_ENDED',score:<number>}`",
+  "  · 运行异常：try/catch 包住主循环，出错发 `{source:'yahaha-game',v:1,type:'GAME_ERROR',message:<string>}`",
+  "  · 监听父窗口消息：`window.addEventListener('message',fn)`，收到 `type==='HOST_RESTART'` 时重开本局，`type==='HOST_INIT'` 时可读取初始化数据。",
+  "- 配色尽量贴合给定 palette；画面有霓虹街机质感。整段代码控制在 ~12KB 以内。",
+].join("\n");
+
+function buildCoderPrompt(idea: string, spec: GameSpec): string {
+  return [
+    `游戏创意（原始输入）：${idea}`,
+    `标题：${spec.title}`,
+    `类型：${spec.genre}；主题：${spec.theme}`,
+    `玩法点：${spec.mechanics.join("；")}`,
+    `操作：${spec.controls}`,
+    `胜负：胜=${spec.winCondition}；负=${spec.loseCondition}`,
+    `配色 palette：${spec.palette.join(", ")}`,
+    `请据此写出完整 game.js。若创意是“跑酷/runner”，做成横向或三轨无限奔跑+跳跃/变道躲避障碍、距离计分、越久越快。`,
+  ].join("\n");
+}
+
+/** 剥 ```js 围栏 / 取首个 IIFE 片段（真实模型偶尔加围栏或前后缀）。 */
+function stripFences(s: string): string {
+  const t = s.trim();
+  const fence = t.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);
+  return (fence ? fence[1] : t).trim();
+}
+
+/** 校验模型生成的 game.js（语法 + 协议 + canvas + 体积 + 禁 import/export）。不通过 → 重试或回退模板。 */
+function validateGameJs(code: string): { ok: boolean; reason: string } {
+  if (!code || code.length < 200) return { ok: false, reason: "代码过短" };
+  if (Buffer.byteLength(code, "utf8") > env.MAX_BUNDLE_BYTES) return { ok: false, reason: "超过体积上限" };
+  if (/\b(import|export)\b[\s{*]/.test(code)) return { ok: false, reason: "含 import/export（需 IIFE 脚本）" };
+  if (!/getContext\s*\(/.test(code)) return { ok: false, reason: "未使用 canvas getContext" };
+  if (!/postMessage/.test(code) || !/GAME_LOADED/.test(code))
+    return { ok: false, reason: "缺 postMessage GAME_LOADED 生命周期" };
+  if (!/GAME_ENDED/.test(code)) return { ok: false, reason: "缺 GAME_ENDED" };
+  // 对齐 VALIDATOR 契约（validator.ts:30）：必须用 yahaha-game 信封 source，否则 VALIDATOR 会让整个任务 FAILED。
+  if (!/["']yahaha-game["']/.test(code)) return { ok: false, reason: "缺 postMessage 信封 source 'yahaha-game'" };
+  try {
+    new Function(code); // 仅编译不执行 → 捕语法错误
+  } catch (e) {
+    return { ok: false, reason: "语法错误: " + String(e instanceof Error ? e.message : e).slice(0, 90) };
+  }
+  return { ok: true, reason: "" };
+}
+
+/** 调 GPT-5.5 写 game.js，校验通过则返回完整产物；否则（坏输出/模型错误）返回 null → 调用方回退模板。 */
+async function runCoderLLM(
+  ctx: AgentContext,
+  spec: GameSpec,
+): Promise<NodeResult<CoderOutput> | null> {
+  const messages: Msg[] = [{ role: "user", content: buildCoderPrompt(ctx.prompt, spec) }];
+  let lastErr = "";
+  let tokensIn = 0;
+  let tokensOut = 0;
+  // 预算守卫：code-gen 每次调用都贵且慢，最多 1 次重试，且总耗时不超过 CODER_LLM_BUDGET_MS；
+  // 超预算/超时/模型错 → 退出循环 → 回退确定性模板（任务永不因慢/坏输出 FAILED）。
+  const deadline = Date.now() + env.CODER_LLM_BUDGET_MS;
+  const MAX_LLM_ATTEMPTS = 2;
+
+  for (let attempt = 0; attempt < MAX_LLM_ATTEMPTS; attempt++) {
+    if (Date.now() >= deadline) {
+      lastErr = `超出 code-gen 预算 ${env.CODER_LLM_BUDGET_MS}ms`;
+      break;
+    }
+    let text = "";
+    try {
+      const res = await ctx.model.chat({ system: CODER_LLM_SYSTEM, messages, seedKey: ctx.seedKey });
+      text = res.text ?? "";
+      tokensIn += res.tokensIn;
+      tokensOut += res.tokensOut;
+    } catch (e) {
+      lastErr = `模型调用失败: ${String(e).slice(0, 120)}`;
+      break; // 模型层错误（含单次超时）→ 直接回退模板
+    }
+    const code = stripFences(text);
+    const v = validateGameJs(code);
+    if (v.ok) {
+      const files = [
+        { path: "index.html", content: indexHtml(spec), contentType: "text/html" },
+        { path: "game.js", content: code, contentType: "application/javascript" },
+        { path: "cover.svg", content: coverSvg(spec), contentType: "image/svg+xml" },
+      ];
+      const output = CoderOutputSchema.parse({ files });
+      const bytes = files.reduce((n, f) => n + Buffer.byteLength(f.content, "utf8"), 0);
+      return {
+        output,
+        tokensIn,
+        tokensOut,
+        inputSummary: `LLM 代码生成 · ${spec.title} · 创意 ${ctx.prompt.length} 字`,
+        outputSummary: `GPT 写 game.js · ${Buffer.byteLength(code, "utf8")} bytes · 共 ${bytes} bytes`,
+      };
+    }
+    // 回喂错误让模型修正
+    lastErr = v.reason;
+    messages.push({ role: "assistant", content: code.slice(0, 120) });
+    messages.push({
+      role: "user",
+      content: `上次 game.js 不合格：${v.reason}。请只输出完整可运行的 game.js（IIFE、用 canvas#c、严格实现 postMessage GAME_LOADED/SCORE/ENDED、无 import/export、无 markdown）。`,
+    });
+  }
+  console.warn(`[coder-llm] 模型代码生成未通过，回退模板。最后原因：${lastErr}`);
+  return null;
+}
+
+// ---- 自然语言微调（refine）：把现有 game.js + 一句话指令交给模型做定向编辑 ----
+
+const CODER_REFINE_SYSTEM = [
+  "你是资深 HTML5 Canvas 游戏工程师。下面给你一份**现有的、可运行的 game.js** 和用户的一句话**修改指令**。",
+  "只按指令做**最小定向修改**，其余逻辑/结构/玩法/数值保持**原样**。输出**完整**的修改后 game.js（整段，不是 diff），不要解释、不要 markdown。",
+  "必须保留：IIFE 结构、用页面已有 `canvas#c`、Yahaha postMessage 协议（`GAME_LOADED`/`GAME_SCORE`/`GAME_ENDED`、监听 `HOST_RESTART`、信封 `source:'yahaha-game'`）。禁 import/export、禁外部网络（CSP connect-src 'none'）。",
+].join("\n");
+
+/** refine：基于现有代码定向编辑。校验通过返回新产物；多次失败 → 抛错（任务 FAILED，原游戏不变），绝不回退模板。 */
+async function runCoderRefine(
+  ctx: AgentContext,
+  spec: GameSpec,
+  existingCode: string,
+): Promise<NodeResult<CoderOutput>> {
+  const messages: Msg[] = [
+    {
+      role: "user",
+      content: `现有 game.js：\n\`\`\`js\n${existingCode}\n\`\`\`\n\n修改指令：${ctx.prompt}\n\n请输出完整的修改后 game.js。`,
+    },
+  ];
+  let lastErr = "";
+  let tokensIn = 0;
+  let tokensOut = 0;
+  const deadline = Date.now() + env.CODER_LLM_BUDGET_MS;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (Date.now() >= deadline) {
+      lastErr = `超出预算 ${env.CODER_LLM_BUDGET_MS}ms`;
+      break;
+    }
+    let text = "";
+    try {
+      const res = await ctx.model.chat({
+        system: CODER_REFINE_SYSTEM,
+        messages,
+        seedKey: `${ctx.seedKey}:refine`,
+      });
+      text = res.text ?? "";
+      tokensIn += res.tokensIn;
+      tokensOut += res.tokensOut;
+    } catch (e) {
+      lastErr = `模型调用失败: ${String(e).slice(0, 120)}`;
+      break;
+    }
+    const code = stripFences(text);
+    const v = validateGameJs(code);
+    if (v.ok) {
+      const files = [
+        { path: "index.html", content: indexHtml(spec), contentType: "text/html" },
+        { path: "game.js", content: code, contentType: "application/javascript" },
+        { path: "cover.svg", content: coverSvg(spec), contentType: "image/svg+xml" },
+      ];
+      const output = CoderOutputSchema.parse({ files });
+      return {
+        output,
+        tokensIn,
+        tokensOut,
+        inputSummary: `微调 · 指令「${ctx.prompt.slice(0, 30)}」· 旧码 ${Buffer.byteLength(existingCode, "utf8")}B`,
+        outputSummary: `GPT 改写 game.js · ${Buffer.byteLength(code, "utf8")} bytes`,
+      };
+    }
+    lastErr = v.reason;
+    messages.push({ role: "assistant", content: code.slice(0, 120) });
+    messages.push({
+      role: "user",
+      content: `修改后不合格：${v.reason}。请输出完整可运行的 game.js（保留所有 postMessage 协议与原玩法），无 markdown。`,
+    });
+  }
+  // refine 不回退模板（会把游戏换成另一个）；明确失败让用户换说法重试，原游戏不受影响。
+  throw new Error(`微调未能生成有效改动（${lastErr}）。原游戏未改动，请换种说法重试。`);
 }

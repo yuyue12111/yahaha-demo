@@ -1,6 +1,8 @@
 import { prisma } from "../db";
 import { env } from "../env";
 import { getModelClient } from "../model";
+import { getObjectText } from "../storage";
+import { publishGameVersion } from "../publish";
 import { publishTaskEvent } from "../events";
 import { toLogDTO } from "../task-serialize";
 import type { AgentName } from "../contracts/tasks";
@@ -15,6 +17,17 @@ import type { AgentContext, AssetRef, NodeResult } from "./types";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** 载入某游戏最新版本的 game.js 源码（refine 用）。game.js 与 manifest.json 同前缀目录。 */
+async function loadLatestGameJs(gameId: string): Promise<string | null> {
+  const v = await prisma.version.findFirst({
+    where: { gameId },
+    orderBy: { versionNumber: "desc" },
+    select: { manifestKey: true },
+  });
+  if (!v?.manifestKey) return null;
+  return getObjectText(v.manifestKey.replace(/\/[^/]*$/, "/game.js"));
+}
+
 /**
  * 生成编排器（docs/04 状态机）。INGEST→PLANNER→ASSET_CURATOR→CODER→VALIDATOR→PACKAGER。
  * 每节点：更新 currentStep + 发 step(start) → 跑 → 写 AgentLog(seq,IO,latency) + 发 log + step(end)。
@@ -26,6 +39,14 @@ export async function runGeneration(taskId: string): Promise<void> {
   if (!task) throw new Error(`GenerationTask ${taskId} 不存在`);
 
   const model = getModelClient();
+
+  // refine（自然语言微调）：载入该游戏最新版本的 game.js 供 CODER 定向编辑。载不到 → 退化为普通生成。
+  let refineCode: string | null = null;
+  if (task.mode === "refine" && task.gameId) {
+    refineCode = await loadLatestGameJs(task.gameId).catch(() => null);
+  }
+  const effectiveMode: "create" | "refine" = task.mode === "refine" && refineCode ? "refine" : "create";
+
   const ctx: AgentContext = {
     taskId,
     userId: task.userId,
@@ -34,6 +55,8 @@ export async function runGeneration(taskId: string): Promise<void> {
     assetIds: task.inputAssetIds,
     seedKey: `${task.prompt}|${[...task.inputAssetIds].sort().join(",")}`,
     model,
+    mode: effectiveMode,
+    refineCode,
   };
 
   // MED-6（纵深）：worker 侧 asset 查询也按 ownerId 作用域，绝不读他人字节。
@@ -100,6 +123,13 @@ export async function runGeneration(taskId: string): Promise<void> {
     const pkg = await step("PACKAGER", "打包上传+写版本", () =>
       runPackager(ctx, spec, coder, validation),
     );
+
+    // refine：把新版本设为 active（发布）→ 玩家立即看到改动（owner 已由 /api/tasks gameId 校验保证）。
+    if (ctx.mode === "refine") {
+      await publishGameVersion({ gameId: pkg.gameId, versionId: pkg.versionId, userId: ctx.userId }).catch(
+        (e) => console.error(`[refine] auto-publish 失败:`, e instanceof Error ? e.message : e),
+      );
+    }
 
     await prisma.generationTask.update({
       where: { id: taskId },

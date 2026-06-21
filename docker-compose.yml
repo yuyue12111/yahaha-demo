@@ -166,6 +166,8 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # 本地 Demo OAuth IdP：默认开 → demo 即可演示完整 授权→回调→账号绑定（无需真凭据，红线⑤可复现）。
+      ENABLE_DEMO_OAUTH: ${ENABLE_DEMO_OAUTH:-true}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
