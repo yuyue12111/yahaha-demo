@@ -37,9 +37,10 @@ const EnvSchema = z.object({
   MODEL_API_KEY: z.string().optional().default(""),
   MODEL_NAME: z.string().min(1).default("gpt-5.5"),
   VISION_MODEL_NAME: z.string().optional().default(""),
-  // CODER 模式：auto = 真模型时用 GPT-5.5 真写 game.js（复杂/多样游戏），mock 时用确定性模板（离线复现）。
-  // template = 永远用模板；llm = 永远用模型（mock 下会回退模板）。
-  CODER_MODE: z.enum(["auto", "template", "llm"]).optional().default("auto"),
+  // CODER 模式（默认 template：秒级确定性、验收快稳）。
+  // auto = 真模型时用 GPT-5.5 真写 game.js（复杂/多样游戏，但慢 ~1–2min，仅 demo 用）；llm = 永远走模型。
+  // 注：template 下模型仍参与 PLANNER 出 spec（配色/标题/玩法随输入变），只是 game.js 用确定性引擎。
+  CODER_MODE: z.enum(["auto", "template", "llm"]).optional().default("template"),
 
   // ---- OAuth 第三方登录（加分项，docs/03 §OAuth）----
   // env-gated：配齐 id+secret 才注册对应 provider（仿模型 seam）。缺省即不启用 → 邮箱登录照常，
