@@ -14,10 +14,13 @@ export function GameManagePanel({
   gameId,
   status,
   initial,
+  publishVersionId = null,
 }: {
   gameId: string;
   status: Status;
   initial: { title: string; summary: string; tags: string[] };
+  /** 草稿的最新 version id：非空 + status=DRAFT → 显示「发布」按钮（设 activeVersionId → 可玩+进 Home）。 */
+  publishVersionId?: string | null;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initial.title);
@@ -58,6 +61,19 @@ export function GameManagePanel({
       });
       if (!res.ok) throw new Error(await errOf(res, "保存失败"));
       setMsg("已保存");
+      router.refresh();
+    });
+
+  const publish = () =>
+    run(async () => {
+      if (!publishVersionId) throw new Error("没有可发布的版本");
+      const res = await fetch(`/api/games/${gameId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ versionId: publishVersionId }),
+      });
+      if (!res.ok) throw new Error(await errOf(res, "发布失败"));
+      setMsg("已发布 —— 现在可在首页浏览并直接游玩");
       router.refresh();
     });
 
@@ -124,7 +140,18 @@ export function GameManagePanel({
         </label>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="primary" size="sm" onClick={() => void save()} disabled={busy || !dirty}>
+          {/* 草稿：一键发布最新版本 → 设 activeVersionId、进 Home、可 Play（修复"生成后无发布入口"缺口）。 */}
+          {status === "DRAFT" && publishVersionId ? (
+            <Button variant="primary" size="sm" onClick={() => void publish()} disabled={busy}>
+              {busy ? "…" : "发布"}
+            </Button>
+          ) : null}
+          <Button
+            variant={status === "DRAFT" && publishVersionId ? "ghost" : "primary"}
+            size="sm"
+            onClick={() => void save()}
+            disabled={busy || !dirty}
+          >
             {busy ? "…" : "保存修改"}
           </Button>
           <Button variant="ghost" size="sm" href={`/create?gameId=${gameId}`}>

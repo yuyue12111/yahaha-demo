@@ -222,11 +222,12 @@ function TaskHistoryList({ tasks }: { tasks: TaskHistoryItem[] }) {
             </span>
             <span className="shrink-0">
               {t.status === "SUCCEEDED" && t.gameId ? (
+                // 一律进详情页：已发布→可玩；未发布草稿→作者可见+一键发布（草稿无 activeVersion，/play 会 GAME_NOT_FOUND）。
                 <Link
-                  href={t.gamePublished ? `/games/${t.gameId}` : `/play/${t.gameId}`}
+                  href={`/games/${t.gameId}`}
                   className="rounded-pill border border-hairline-strong px-3 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
                 >
-                  查看产物
+                  {t.gamePublished ? "查看产物" : "查看产物（草稿）"}
                 </Link>
               ) : t.status === "FAILED" ? (
                 <TaskRetryButton taskId={t.id} />

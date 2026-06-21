@@ -22,7 +22,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const session = await auth();
   const userId = session?.user?.id ?? null;
-  const [game, active, liked, favorited] = await Promise.all([
+  const [game, active, liked, favorited, latestVersion] = await Promise.all([
     prisma.game.findUnique({
       where: { id },
       include: {
@@ -38,6 +38,12 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
     userId
       ? prisma.favorite.findUnique({ where: { userId_gameId: { userId, gameId: id } }, select: { id: true } })
       : Promise.resolve(null),
+    // 最新 version id（草稿发布用）：作者在详情页一键发布最新版本。
+    prisma.version.findFirst({
+      where: { gameId: id },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true },
+    }),
   ]);
 
   if (!game) notFound();
@@ -157,6 +163,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           gameId={game.id}
           status={game.status}
           initial={{ title: game.title, summary: game.summary, tags: game.tags }}
+          publishVersionId={latestVersion?.id ?? null}
         />
       ) : null}
     </div>
